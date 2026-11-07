@@ -139,7 +139,7 @@ The local database needs a persistent filesystem and a Node runtime. This change
 
 Verified here:
 
-- 38 automated tests: all passed, including provider boundaries, lost-response recovery, expiry, mode changes, concurrent retries, cancellation, transaction rollback and retention.
+- 41 automated tests: all passed, including provider boundaries, lost-response recovery, expiry, mode changes, concurrent retries, cancellation, transaction rollback and retention.
 - Care/Rehab/Panda production builds: all passed; Panda rebuilt after its final implementation changes.
 - 19 connected integration checks plus all three standalone fixture checks: passed.
 - Browser: sourced plan read, keyboard entry, explicit confirmation, truthful fixture result, persisted history reload, Emergency dialog, and 390-pixel layout without horizontal overflow.
@@ -172,3 +172,7 @@ Do not claim those later capabilities are implemented. No healthcare service, em
 - Installed Next.js documentation in `node_modules/next/dist/docs/`.
 
 Existing baseline and this implementation are AI-assisted. Preserve the team's event/build disclosure.
+
+## Actionables and generated patient data update
+
+Today now groups medicines, exercise and check-in requests. The shared seed has 12 fictional patient records, with Alex as the single active default identity. See [dataset documentation](SYNTHETIC_PATIENTS.md) for regeneration, contract compatibility and runtime-store behavior. Context also adds an optional synthetic patient profile for the greeting.

@@ -11,3 +11,5 @@
 - Clinical limits: no validated clinical decision support, real provider delivery or emergency dispatch. Demonstration measurements are not evidence of treatment efficacy.
 
 Ranveer implementation update (November 7, 2026): AI-assisted voice UI, SQLite repository, provider boundaries, tests and CI were added on branch ranveer/voice. See RANVEER_HANDOFF.md and the updated VALIDATION.md for actual evidence. Live provider/device tests remain pending; the source patch records the exact commit.
+
+Synthetic-data update: 12 fictional patient records were generated for UI/testing, with one active default identity (Alex). Medication examples and schedules are synthetic sample data, not patient-specific advice. No existing clinical store was overwritten.

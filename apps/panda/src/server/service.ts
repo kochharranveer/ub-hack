@@ -4,6 +4,7 @@ import {
   type VoiceCommand, type VoiceReply, type VoiceContext,
 } from "../../../../packages/contracts/voice";
 import type { CareSnapshot } from "../../../../packages/contracts/care";
+import { demoPatientProfile } from "../../../../packages/contracts/fixtures";
 import { DomainError } from "../../../../packages/platform/json-store";
 import { getCare, callPeer, connected } from "../../../../packages/platform/peers";
 import { classify, providerStatus } from "./provider";
@@ -36,6 +37,7 @@ export function voiceService(
       const provider = providerStatus();
       const speech = speechStatus();
       return {
+        patient: demoPatientProfile(c.patientId),
         plan: c.plan, tasks: c.tasks, help: c.help, mode: bridge.mode,
         aiEngine: provider.engine, aiConfigured: provider.configured,
         ttsEngine: speech.engine, ttsConfigured: speech.configured,

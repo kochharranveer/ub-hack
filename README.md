@@ -24,7 +24,7 @@ npm run dev
 
 Open **http://localhost:3000**. `/` is Ranveer's app; `/care` and `/rehab` are proxied to the other two Next.js apps, including their assets and API routes. Use ordinary anchor navigation between zones. All apps remain separate build/deployment units; no copying React components between them, no iframes, no fourth product app.
 
-Defaults need no keys. Connected mode uses real local inter-app HTTP, voice-owned SQLite, and Care/Rehab JSON-file persistence; it does not mean connected to a real clinic. Browser microphone support varies; text is always available.
+A shared [12-patient synthetic dataset](docs/SYNTHETIC_PATIENTS.md) supplies the demo, with Alex active by default. Defaults need no keys. Connected mode uses real local inter-app HTTP, voice-owned SQLite, and Care/Rehab JSON-file persistence; it does not mean connected to a real clinic. Browser microphone support varies; text is always available.
 
 ## Work independently
 

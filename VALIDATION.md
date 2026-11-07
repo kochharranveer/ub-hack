@@ -3,7 +3,7 @@
 This records the Ranveer voice implementation on the v0.2 baseline. It is not clinical-product acceptance.
 
 - `npm ci`: passed using the supplied lockfile; no new package dependency.
-- `npm run check`: passed, with TypeScript across all three apps and **38 tests, zero failures**.
+- `npm run check`: passed, with TypeScript across all three apps and **41 tests, zero failures**.
 - `npm run build`: all three apps built. Panda was rebuilt after the final UI, confirmation and adapter changes.
 - `npm run test:integration`: **19 gateway checks passed**, including no write before confirmation, stable retry, resolved history, dismissal, stale-plan rejection, report save/retry, help/report acknowledgement and app assets.
 - Panda, Care and Rehab each started independently and returned explicit fixture context.
@@ -28,3 +28,5 @@ npm run test:integration
 Stop other servers on ports 3000–3002 first. The integration runner isolates storage in temporary directories.
 
 See [Ranveer's handoff](docs/RANVEER_HANDOFF.md) for payload examples, storage/retention semantics, live provider setup, teammate reviews and the remaining implementation checklist.
+
+Patient-data update: all 12 fictional snapshots validated against contract 2.0.0. Browser QA verified the specific medicine task, separate completion confirmation, and editable check-in request/proposal. At 390 × 844, the talk control ends above the dock and the page has no horizontal overflow.

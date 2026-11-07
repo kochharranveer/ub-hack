@@ -1,0 +1,1443 @@
+{
+  "datasetVersion": "1.0.0",
+  "contractVersion": "2.0.0",
+  "synthetic": true,
+  "seed": 20261107,
+  "referenceDate": "2026-11-07",
+  "defaultPatientId": "pat-demo-001",
+  "description": "Entirely fictional UI/test data. Medication schedules are illustrative samples, not prescriptions or clinically validated patient plans. No real patient records, exercise measurements or booked appointments.",
+  "medicationReferences": [
+    {
+      "name": "Atorvastatin",
+      "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2024/020702s081lbl.pdf"
+    },
+    {
+      "name": "Metformin hydrochloride",
+      "url": "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=30658e19-8e6e-49aa-a007-e414224797c5"
+    }
+  ],
+  "patients": [
+    {
+      "id": "pat-demo-001",
+      "synthetic": true,
+      "firstName": "Alex",
+      "displayName": "Alex Morgan",
+      "ageYears": 57,
+      "timezone": "America/New_York",
+      "careTeam": {
+        "id": "team-demo-1",
+        "clinicianName": "Taylor Rowan",
+        "synthetic": true
+      },
+      "medications": [
+        {
+          "id": "med-demo-001",
+          "name": "Atorvastatin",
+          "strength": "10 mg",
+          "dose": "1 tablet",
+          "route": "oral",
+          "times": [
+            "20:00"
+          ],
+          "withFood": false,
+          "synthetic": true
+        }
+      ],
+      "exercise": {
+        "exerciseId": "demo-elbow",
+        "title": "Demonstration elbow movement",
+        "tracking": "not_started",
+        "evidence": "none",
+        "synthetic": true
+      },
+      "checkIn": {
+        "status": "not_requested",
+        "preferredDate": "2026-11-14",
+        "booked": false,
+        "synthetic": true
+      },
+      "care": {
+        "contractVersion": "2.0.0",
+        "patientId": "pat-demo-001",
+        "plan": {
+          "id": "plan-demo-001",
+          "patientId": "pat-demo-001",
+          "version": 1,
+          "status": "approved",
+          "sourceText": "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\nAtorvastatin 10 mg · 1 tablet · 8:00 PM\nExercise: use the demonstration elbow movement in Rehab.\nSchedule a check-in: request a time with the demo care team.",
+          "instructions": [
+            {
+              "id": "line-1",
+              "text": "Atorvastatin 10 mg · 1 tablet · 8:00 PM",
+              "sourceRef": "demo-patients.json#/patients/0/care/plan/instructions/0"
+            },
+            {
+              "id": "line-2",
+              "text": "Exercise: use the demonstration elbow movement in Rehab.",
+              "sourceRef": "demo-patients.json#/patients/0/care/plan/instructions/1"
+            },
+            {
+              "id": "line-3",
+              "text": "Schedule a check-in: request a time with the demo care team.",
+              "sourceRef": "demo-patients.json#/patients/0/care/plan/instructions/2"
+            }
+          ],
+          "approvedBy": "demo-clinician",
+          "demoOnly": true
+        },
+        "drafts": [],
+        "tasks": [
+          {
+            "id": "task-demo-001",
+            "patientId": "pat-demo-001",
+            "planId": "plan-demo-001",
+            "planVersion": 1,
+            "title": "Atorvastatin 10 mg · 1 tablet · 8:00 PM",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-001-2",
+            "patientId": "pat-demo-001",
+            "planId": "plan-demo-001",
+            "planVersion": 1,
+            "title": "Exercise: use the demonstration elbow movement in Rehab.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-001-3",
+            "patientId": "pat-demo-001",
+            "planId": "plan-demo-001",
+            "planVersion": 1,
+            "title": "Schedule a check-in: request a time with the demo care team.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          }
+        ],
+        "help": [],
+        "acknowledgements": []
+      }
+    },
+    {
+      "id": "pat-demo-002",
+      "synthetic": true,
+      "firstName": "Maya",
+      "displayName": "Maya Patel",
+      "ageYears": 58,
+      "timezone": "America/New_York",
+      "careTeam": {
+        "id": "team-demo-2",
+        "clinicianName": "Casey Ellis",
+        "synthetic": true
+      },
+      "medications": [
+        {
+          "id": "med-demo-002",
+          "name": "Atorvastatin",
+          "strength": "10 mg",
+          "dose": "1 tablet",
+          "route": "oral",
+          "times": [
+            "20:00"
+          ],
+          "withFood": false,
+          "synthetic": true
+        }
+      ],
+      "exercise": {
+        "exerciseId": "demo-elbow",
+        "title": "Demonstration elbow movement",
+        "tracking": "not_started",
+        "evidence": "none",
+        "synthetic": true
+      },
+      "checkIn": {
+        "status": "not_requested",
+        "preferredDate": "2026-11-13",
+        "booked": false,
+        "synthetic": true
+      },
+      "care": {
+        "contractVersion": "2.0.0",
+        "patientId": "pat-demo-002",
+        "plan": {
+          "id": "plan-demo-002",
+          "patientId": "pat-demo-002",
+          "version": 1,
+          "status": "approved",
+          "sourceText": "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\nAtorvastatin 10 mg · 1 tablet · 8:00 PM\nExercise: use the demonstration elbow movement in Rehab.\nSchedule a check-in: request a time with the demo care team.",
+          "instructions": [
+            {
+              "id": "line-1",
+              "text": "Atorvastatin 10 mg · 1 tablet · 8:00 PM",
+              "sourceRef": "demo-patients.json#/patients/1/care/plan/instructions/0"
+            },
+            {
+              "id": "line-2",
+              "text": "Exercise: use the demonstration elbow movement in Rehab.",
+              "sourceRef": "demo-patients.json#/patients/1/care/plan/instructions/1"
+            },
+            {
+              "id": "line-3",
+              "text": "Schedule a check-in: request a time with the demo care team.",
+              "sourceRef": "demo-patients.json#/patients/1/care/plan/instructions/2"
+            }
+          ],
+          "approvedBy": "demo-clinician",
+          "demoOnly": true
+        },
+        "drafts": [],
+        "tasks": [
+          {
+            "id": "task-demo-002-1",
+            "patientId": "pat-demo-002",
+            "planId": "plan-demo-002",
+            "planVersion": 1,
+            "title": "Atorvastatin 10 mg · 1 tablet · 8:00 PM",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-002-2",
+            "patientId": "pat-demo-002",
+            "planId": "plan-demo-002",
+            "planVersion": 1,
+            "title": "Exercise: use the demonstration elbow movement in Rehab.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-002-3",
+            "patientId": "pat-demo-002",
+            "planId": "plan-demo-002",
+            "planVersion": 1,
+            "title": "Schedule a check-in: request a time with the demo care team.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          }
+        ],
+        "help": [],
+        "acknowledgements": []
+      }
+    },
+    {
+      "id": "pat-demo-003",
+      "synthetic": true,
+      "firstName": "Jordan",
+      "displayName": "Jordan Rivera",
+      "ageYears": 53,
+      "timezone": "America/New_York",
+      "careTeam": {
+        "id": "team-demo-3",
+        "clinicianName": "Drew Lane",
+        "synthetic": true
+      },
+      "medications": [
+        {
+          "id": "med-demo-003",
+          "name": "Metformin hydrochloride",
+          "strength": "500 mg",
+          "dose": "1 tablet",
+          "route": "oral",
+          "times": [
+            "08:00",
+            "18:00"
+          ],
+          "withFood": true,
+          "synthetic": true
+        }
+      ],
+      "exercise": {
+        "exerciseId": "demo-elbow",
+        "title": "Demonstration elbow movement",
+        "tracking": "not_started",
+        "evidence": "none",
+        "synthetic": true
+      },
+      "checkIn": {
+        "status": "not_requested",
+        "preferredDate": "2026-11-13",
+        "booked": false,
+        "synthetic": true
+      },
+      "care": {
+        "contractVersion": "2.0.0",
+        "patientId": "pat-demo-003",
+        "plan": {
+          "id": "plan-demo-003",
+          "patientId": "pat-demo-003",
+          "version": 1,
+          "status": "approved",
+          "sourceText": "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\nMetformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal\nMetformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal\nExercise: use the demonstration elbow movement in Rehab.\nSchedule a check-in: request a time with the demo care team.",
+          "instructions": [
+            {
+              "id": "line-1",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+              "sourceRef": "demo-patients.json#/patients/2/care/plan/instructions/0"
+            },
+            {
+              "id": "line-2",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+              "sourceRef": "demo-patients.json#/patients/2/care/plan/instructions/1"
+            },
+            {
+              "id": "line-3",
+              "text": "Exercise: use the demonstration elbow movement in Rehab.",
+              "sourceRef": "demo-patients.json#/patients/2/care/plan/instructions/2"
+            },
+            {
+              "id": "line-4",
+              "text": "Schedule a check-in: request a time with the demo care team.",
+              "sourceRef": "demo-patients.json#/patients/2/care/plan/instructions/3"
+            }
+          ],
+          "approvedBy": "demo-clinician",
+          "demoOnly": true
+        },
+        "drafts": [],
+        "tasks": [
+          {
+            "id": "task-demo-003-1",
+            "patientId": "pat-demo-003",
+            "planId": "plan-demo-003",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-003-2",
+            "patientId": "pat-demo-003",
+            "planId": "plan-demo-003",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+            "status": "completed",
+            "revision": 1,
+            "evidence": "patient_reported"
+          },
+          {
+            "id": "task-demo-003-3",
+            "patientId": "pat-demo-003",
+            "planId": "plan-demo-003",
+            "planVersion": 1,
+            "title": "Exercise: use the demonstration elbow movement in Rehab.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-003-4",
+            "patientId": "pat-demo-003",
+            "planId": "plan-demo-003",
+            "planVersion": 1,
+            "title": "Schedule a check-in: request a time with the demo care team.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          }
+        ],
+        "help": [],
+        "acknowledgements": []
+      }
+    },
+    {
+      "id": "pat-demo-004",
+      "synthetic": true,
+      "firstName": "Priya",
+      "displayName": "Priya Kim",
+      "ageYears": 56,
+      "timezone": "America/New_York",
+      "careTeam": {
+        "id": "team-demo-1",
+        "clinicianName": "Taylor Rowan",
+        "synthetic": true
+      },
+      "medications": [
+        {
+          "id": "med-demo-004",
+          "name": "Metformin hydrochloride",
+          "strength": "500 mg",
+          "dose": "1 tablet",
+          "route": "oral",
+          "times": [
+            "08:00",
+            "18:00"
+          ],
+          "withFood": true,
+          "synthetic": true
+        }
+      ],
+      "exercise": {
+        "exerciseId": "demo-elbow",
+        "title": "Demonstration elbow movement",
+        "tracking": "not_started",
+        "evidence": "none",
+        "synthetic": true
+      },
+      "checkIn": {
+        "status": "not_requested",
+        "preferredDate": "2026-11-09",
+        "booked": false,
+        "synthetic": true
+      },
+      "care": {
+        "contractVersion": "2.0.0",
+        "patientId": "pat-demo-004",
+        "plan": {
+          "id": "plan-demo-004",
+          "patientId": "pat-demo-004",
+          "version": 1,
+          "status": "approved",
+          "sourceText": "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\nMetformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal\nMetformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal\nExercise: use the demonstration elbow movement in Rehab.\nSchedule a check-in: request a time with the demo care team.",
+          "instructions": [
+            {
+              "id": "line-1",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+              "sourceRef": "demo-patients.json#/patients/3/care/plan/instructions/0"
+            },
+            {
+              "id": "line-2",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+              "sourceRef": "demo-patients.json#/patients/3/care/plan/instructions/1"
+            },
+            {
+              "id": "line-3",
+              "text": "Exercise: use the demonstration elbow movement in Rehab.",
+              "sourceRef": "demo-patients.json#/patients/3/care/plan/instructions/2"
+            },
+            {
+              "id": "line-4",
+              "text": "Schedule a check-in: request a time with the demo care team.",
+              "sourceRef": "demo-patients.json#/patients/3/care/plan/instructions/3"
+            }
+          ],
+          "approvedBy": "demo-clinician",
+          "demoOnly": true
+        },
+        "drafts": [],
+        "tasks": [
+          {
+            "id": "task-demo-004-1",
+            "patientId": "pat-demo-004",
+            "planId": "plan-demo-004",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+            "status": "completed",
+            "revision": 1,
+            "evidence": "patient_reported"
+          },
+          {
+            "id": "task-demo-004-2",
+            "patientId": "pat-demo-004",
+            "planId": "plan-demo-004",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-004-3",
+            "patientId": "pat-demo-004",
+            "planId": "plan-demo-004",
+            "planVersion": 1,
+            "title": "Exercise: use the demonstration elbow movement in Rehab.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-004-4",
+            "patientId": "pat-demo-004",
+            "planId": "plan-demo-004",
+            "planVersion": 1,
+            "title": "Schedule a check-in: request a time with the demo care team.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          }
+        ],
+        "help": [],
+        "acknowledgements": []
+      }
+    },
+    {
+      "id": "pat-demo-005",
+      "synthetic": true,
+      "firstName": "Sam",
+      "displayName": "Sam Brooks",
+      "ageYears": 55,
+      "timezone": "America/New_York",
+      "careTeam": {
+        "id": "team-demo-2",
+        "clinicianName": "Casey Ellis",
+        "synthetic": true
+      },
+      "medications": [
+        {
+          "id": "med-demo-005",
+          "name": "Metformin hydrochloride",
+          "strength": "500 mg",
+          "dose": "1 tablet",
+          "route": "oral",
+          "times": [
+            "08:00",
+            "18:00"
+          ],
+          "withFood": true,
+          "synthetic": true
+        }
+      ],
+      "exercise": {
+        "exerciseId": "demo-elbow",
+        "title": "Demonstration elbow movement",
+        "tracking": "not_started",
+        "evidence": "none",
+        "synthetic": true
+      },
+      "checkIn": {
+        "status": "requested",
+        "preferredDate": "2026-11-13",
+        "booked": false,
+        "synthetic": true
+      },
+      "care": {
+        "contractVersion": "2.0.0",
+        "patientId": "pat-demo-005",
+        "plan": {
+          "id": "plan-demo-005",
+          "patientId": "pat-demo-005",
+          "version": 1,
+          "status": "approved",
+          "sourceText": "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\nMetformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal\nMetformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal\nExercise: use the demonstration elbow movement in Rehab.\nSchedule a check-in: request a time with the demo care team.",
+          "instructions": [
+            {
+              "id": "line-1",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+              "sourceRef": "demo-patients.json#/patients/4/care/plan/instructions/0"
+            },
+            {
+              "id": "line-2",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+              "sourceRef": "demo-patients.json#/patients/4/care/plan/instructions/1"
+            },
+            {
+              "id": "line-3",
+              "text": "Exercise: use the demonstration elbow movement in Rehab.",
+              "sourceRef": "demo-patients.json#/patients/4/care/plan/instructions/2"
+            },
+            {
+              "id": "line-4",
+              "text": "Schedule a check-in: request a time with the demo care team.",
+              "sourceRef": "demo-patients.json#/patients/4/care/plan/instructions/3"
+            }
+          ],
+          "approvedBy": "demo-clinician",
+          "demoOnly": true
+        },
+        "drafts": [],
+        "tasks": [
+          {
+            "id": "task-demo-005-1",
+            "patientId": "pat-demo-005",
+            "planId": "plan-demo-005",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+            "status": "completed",
+            "revision": 1,
+            "evidence": "patient_reported"
+          },
+          {
+            "id": "task-demo-005-2",
+            "patientId": "pat-demo-005",
+            "planId": "plan-demo-005",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-005-3",
+            "patientId": "pat-demo-005",
+            "planId": "plan-demo-005",
+            "planVersion": 1,
+            "title": "Exercise: use the demonstration elbow movement in Rehab.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-005-4",
+            "patientId": "pat-demo-005",
+            "planId": "plan-demo-005",
+            "planVersion": 1,
+            "title": "Schedule a check-in: request a time with the demo care team.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          }
+        ],
+        "help": [
+          {
+            "id": "help-demo-005",
+            "patientId": "pat-demo-005",
+            "quote": "I would like help scheduling a check-in with my care team.",
+            "status": "open",
+            "createdAt": "2026-11-07T15:00:00.000Z",
+            "acknowledgedBy": null
+          }
+        ],
+        "acknowledgements": []
+      }
+    },
+    {
+      "id": "pat-demo-006",
+      "synthetic": true,
+      "firstName": "Elena",
+      "displayName": "Elena Chen",
+      "ageYears": 63,
+      "timezone": "America/New_York",
+      "careTeam": {
+        "id": "team-demo-3",
+        "clinicianName": "Drew Lane",
+        "synthetic": true
+      },
+      "medications": [
+        {
+          "id": "med-demo-006",
+          "name": "Metformin hydrochloride",
+          "strength": "500 mg",
+          "dose": "1 tablet",
+          "route": "oral",
+          "times": [
+            "08:00",
+            "18:00"
+          ],
+          "withFood": true,
+          "synthetic": true
+        }
+      ],
+      "exercise": {
+        "exerciseId": "demo-elbow",
+        "title": "Demonstration elbow movement",
+        "tracking": "not_started",
+        "evidence": "none",
+        "synthetic": true
+      },
+      "checkIn": {
+        "status": "not_requested",
+        "preferredDate": "2026-11-09",
+        "booked": false,
+        "synthetic": true
+      },
+      "care": {
+        "contractVersion": "2.0.0",
+        "patientId": "pat-demo-006",
+        "plan": {
+          "id": "plan-demo-006",
+          "patientId": "pat-demo-006",
+          "version": 1,
+          "status": "approved",
+          "sourceText": "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\nMetformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal\nMetformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal\nExercise: use the demonstration elbow movement in Rehab.\nSchedule a check-in: request a time with the demo care team.",
+          "instructions": [
+            {
+              "id": "line-1",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+              "sourceRef": "demo-patients.json#/patients/5/care/plan/instructions/0"
+            },
+            {
+              "id": "line-2",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+              "sourceRef": "demo-patients.json#/patients/5/care/plan/instructions/1"
+            },
+            {
+              "id": "line-3",
+              "text": "Exercise: use the demonstration elbow movement in Rehab.",
+              "sourceRef": "demo-patients.json#/patients/5/care/plan/instructions/2"
+            },
+            {
+              "id": "line-4",
+              "text": "Schedule a check-in: request a time with the demo care team.",
+              "sourceRef": "demo-patients.json#/patients/5/care/plan/instructions/3"
+            }
+          ],
+          "approvedBy": "demo-clinician",
+          "demoOnly": true
+        },
+        "drafts": [],
+        "tasks": [
+          {
+            "id": "task-demo-006-1",
+            "patientId": "pat-demo-006",
+            "planId": "plan-demo-006",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+            "status": "completed",
+            "revision": 1,
+            "evidence": "patient_reported"
+          },
+          {
+            "id": "task-demo-006-2",
+            "patientId": "pat-demo-006",
+            "planId": "plan-demo-006",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-006-3",
+            "patientId": "pat-demo-006",
+            "planId": "plan-demo-006",
+            "planVersion": 1,
+            "title": "Exercise: use the demonstration elbow movement in Rehab.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-006-4",
+            "patientId": "pat-demo-006",
+            "planId": "plan-demo-006",
+            "planVersion": 1,
+            "title": "Schedule a check-in: request a time with the demo care team.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          }
+        ],
+        "help": [],
+        "acknowledgements": []
+      }
+    },
+    {
+      "id": "pat-demo-007",
+      "synthetic": true,
+      "firstName": "Noah",
+      "displayName": "Noah Reed",
+      "ageYears": 68,
+      "timezone": "America/New_York",
+      "careTeam": {
+        "id": "team-demo-1",
+        "clinicianName": "Taylor Rowan",
+        "synthetic": true
+      },
+      "medications": [
+        {
+          "id": "med-demo-007",
+          "name": "Metformin hydrochloride",
+          "strength": "500 mg",
+          "dose": "1 tablet",
+          "route": "oral",
+          "times": [
+            "08:00",
+            "18:00"
+          ],
+          "withFood": true,
+          "synthetic": true
+        }
+      ],
+      "exercise": {
+        "exerciseId": "demo-elbow",
+        "title": "Demonstration elbow movement",
+        "tracking": "not_started",
+        "evidence": "none",
+        "synthetic": true
+      },
+      "checkIn": {
+        "status": "not_requested",
+        "preferredDate": "2026-11-14",
+        "booked": false,
+        "synthetic": true
+      },
+      "care": {
+        "contractVersion": "2.0.0",
+        "patientId": "pat-demo-007",
+        "plan": {
+          "id": "plan-demo-007",
+          "patientId": "pat-demo-007",
+          "version": 1,
+          "status": "approved",
+          "sourceText": "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\nMetformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal\nMetformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal\nExercise: use the demonstration elbow movement in Rehab.\nSchedule a check-in: request a time with the demo care team.",
+          "instructions": [
+            {
+              "id": "line-1",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+              "sourceRef": "demo-patients.json#/patients/6/care/plan/instructions/0"
+            },
+            {
+              "id": "line-2",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+              "sourceRef": "demo-patients.json#/patients/6/care/plan/instructions/1"
+            },
+            {
+              "id": "line-3",
+              "text": "Exercise: use the demonstration elbow movement in Rehab.",
+              "sourceRef": "demo-patients.json#/patients/6/care/plan/instructions/2"
+            },
+            {
+              "id": "line-4",
+              "text": "Schedule a check-in: request a time with the demo care team.",
+              "sourceRef": "demo-patients.json#/patients/6/care/plan/instructions/3"
+            }
+          ],
+          "approvedBy": "demo-clinician",
+          "demoOnly": true
+        },
+        "drafts": [],
+        "tasks": [
+          {
+            "id": "task-demo-007-1",
+            "patientId": "pat-demo-007",
+            "planId": "plan-demo-007",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+            "status": "completed",
+            "revision": 1,
+            "evidence": "patient_reported"
+          },
+          {
+            "id": "task-demo-007-2",
+            "patientId": "pat-demo-007",
+            "planId": "plan-demo-007",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+            "status": "completed",
+            "revision": 1,
+            "evidence": "patient_reported"
+          },
+          {
+            "id": "task-demo-007-3",
+            "patientId": "pat-demo-007",
+            "planId": "plan-demo-007",
+            "planVersion": 1,
+            "title": "Exercise: use the demonstration elbow movement in Rehab.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-007-4",
+            "patientId": "pat-demo-007",
+            "planId": "plan-demo-007",
+            "planVersion": 1,
+            "title": "Schedule a check-in: request a time with the demo care team.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          }
+        ],
+        "help": [],
+        "acknowledgements": []
+      }
+    },
+    {
+      "id": "pat-demo-008",
+      "synthetic": true,
+      "firstName": "Avery",
+      "displayName": "Avery Singh",
+      "ageYears": 55,
+      "timezone": "America/New_York",
+      "careTeam": {
+        "id": "team-demo-2",
+        "clinicianName": "Casey Ellis",
+        "synthetic": true
+      },
+      "medications": [
+        {
+          "id": "med-demo-008",
+          "name": "Metformin hydrochloride",
+          "strength": "500 mg",
+          "dose": "1 tablet",
+          "route": "oral",
+          "times": [
+            "08:00",
+            "18:00"
+          ],
+          "withFood": true,
+          "synthetic": true
+        }
+      ],
+      "exercise": {
+        "exerciseId": "demo-elbow",
+        "title": "Demonstration elbow movement",
+        "tracking": "not_started",
+        "evidence": "none",
+        "synthetic": true
+      },
+      "checkIn": {
+        "status": "requested",
+        "preferredDate": "2026-11-09",
+        "booked": false,
+        "synthetic": true
+      },
+      "care": {
+        "contractVersion": "2.0.0",
+        "patientId": "pat-demo-008",
+        "plan": {
+          "id": "plan-demo-008",
+          "patientId": "pat-demo-008",
+          "version": 1,
+          "status": "approved",
+          "sourceText": "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\nMetformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal\nMetformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal\nExercise: use the demonstration elbow movement in Rehab.\nSchedule a check-in: request a time with the demo care team.",
+          "instructions": [
+            {
+              "id": "line-1",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+              "sourceRef": "demo-patients.json#/patients/7/care/plan/instructions/0"
+            },
+            {
+              "id": "line-2",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+              "sourceRef": "demo-patients.json#/patients/7/care/plan/instructions/1"
+            },
+            {
+              "id": "line-3",
+              "text": "Exercise: use the demonstration elbow movement in Rehab.",
+              "sourceRef": "demo-patients.json#/patients/7/care/plan/instructions/2"
+            },
+            {
+              "id": "line-4",
+              "text": "Schedule a check-in: request a time with the demo care team.",
+              "sourceRef": "demo-patients.json#/patients/7/care/plan/instructions/3"
+            }
+          ],
+          "approvedBy": "demo-clinician",
+          "demoOnly": true
+        },
+        "drafts": [],
+        "tasks": [
+          {
+            "id": "task-demo-008-1",
+            "patientId": "pat-demo-008",
+            "planId": "plan-demo-008",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-008-2",
+            "patientId": "pat-demo-008",
+            "planId": "plan-demo-008",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-008-3",
+            "patientId": "pat-demo-008",
+            "planId": "plan-demo-008",
+            "planVersion": 1,
+            "title": "Exercise: use the demonstration elbow movement in Rehab.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-008-4",
+            "patientId": "pat-demo-008",
+            "planId": "plan-demo-008",
+            "planVersion": 1,
+            "title": "Schedule a check-in: request a time with the demo care team.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          }
+        ],
+        "help": [
+          {
+            "id": "help-demo-008",
+            "patientId": "pat-demo-008",
+            "quote": "I would like help scheduling a check-in with my care team.",
+            "status": "open",
+            "createdAt": "2026-11-07T15:00:00.000Z",
+            "acknowledgedBy": null
+          }
+        ],
+        "acknowledgements": []
+      }
+    },
+    {
+      "id": "pat-demo-009",
+      "synthetic": true,
+      "firstName": "Leah",
+      "displayName": "Leah Bennett",
+      "ageYears": 61,
+      "timezone": "America/New_York",
+      "careTeam": {
+        "id": "team-demo-3",
+        "clinicianName": "Drew Lane",
+        "synthetic": true
+      },
+      "medications": [
+        {
+          "id": "med-demo-009",
+          "name": "Metformin hydrochloride",
+          "strength": "500 mg",
+          "dose": "1 tablet",
+          "route": "oral",
+          "times": [
+            "08:00",
+            "18:00"
+          ],
+          "withFood": true,
+          "synthetic": true
+        }
+      ],
+      "exercise": {
+        "exerciseId": "demo-elbow",
+        "title": "Demonstration elbow movement",
+        "tracking": "not_started",
+        "evidence": "none",
+        "synthetic": true
+      },
+      "checkIn": {
+        "status": "not_requested",
+        "preferredDate": "2026-11-13",
+        "booked": false,
+        "synthetic": true
+      },
+      "care": {
+        "contractVersion": "2.0.0",
+        "patientId": "pat-demo-009",
+        "plan": {
+          "id": "plan-demo-009",
+          "patientId": "pat-demo-009",
+          "version": 1,
+          "status": "approved",
+          "sourceText": "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\nMetformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal\nMetformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal\nExercise: use the demonstration elbow movement in Rehab.\nSchedule a check-in: request a time with the demo care team.",
+          "instructions": [
+            {
+              "id": "line-1",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+              "sourceRef": "demo-patients.json#/patients/8/care/plan/instructions/0"
+            },
+            {
+              "id": "line-2",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+              "sourceRef": "demo-patients.json#/patients/8/care/plan/instructions/1"
+            },
+            {
+              "id": "line-3",
+              "text": "Exercise: use the demonstration elbow movement in Rehab.",
+              "sourceRef": "demo-patients.json#/patients/8/care/plan/instructions/2"
+            },
+            {
+              "id": "line-4",
+              "text": "Schedule a check-in: request a time with the demo care team.",
+              "sourceRef": "demo-patients.json#/patients/8/care/plan/instructions/3"
+            }
+          ],
+          "approvedBy": "demo-clinician",
+          "demoOnly": true
+        },
+        "drafts": [],
+        "tasks": [
+          {
+            "id": "task-demo-009-1",
+            "patientId": "pat-demo-009",
+            "planId": "plan-demo-009",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-009-2",
+            "patientId": "pat-demo-009",
+            "planId": "plan-demo-009",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-009-3",
+            "patientId": "pat-demo-009",
+            "planId": "plan-demo-009",
+            "planVersion": 1,
+            "title": "Exercise: use the demonstration elbow movement in Rehab.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-009-4",
+            "patientId": "pat-demo-009",
+            "planId": "plan-demo-009",
+            "planVersion": 1,
+            "title": "Schedule a check-in: request a time with the demo care team.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          }
+        ],
+        "help": [],
+        "acknowledgements": []
+      }
+    },
+    {
+      "id": "pat-demo-010",
+      "synthetic": true,
+      "firstName": "Daniel",
+      "displayName": "Daniel Lewis",
+      "ageYears": 40,
+      "timezone": "America/New_York",
+      "careTeam": {
+        "id": "team-demo-1",
+        "clinicianName": "Taylor Rowan",
+        "synthetic": true
+      },
+      "medications": [
+        {
+          "id": "med-demo-010",
+          "name": "Metformin hydrochloride",
+          "strength": "500 mg",
+          "dose": "1 tablet",
+          "route": "oral",
+          "times": [
+            "08:00",
+            "18:00"
+          ],
+          "withFood": true,
+          "synthetic": true
+        }
+      ],
+      "exercise": {
+        "exerciseId": "demo-elbow",
+        "title": "Demonstration elbow movement",
+        "tracking": "not_started",
+        "evidence": "none",
+        "synthetic": true
+      },
+      "checkIn": {
+        "status": "not_requested",
+        "preferredDate": "2026-11-09",
+        "booked": false,
+        "synthetic": true
+      },
+      "care": {
+        "contractVersion": "2.0.0",
+        "patientId": "pat-demo-010",
+        "plan": {
+          "id": "plan-demo-010",
+          "patientId": "pat-demo-010",
+          "version": 1,
+          "status": "approved",
+          "sourceText": "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\nMetformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal\nMetformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal\nExercise: use the demonstration elbow movement in Rehab.\nSchedule a check-in: request a time with the demo care team.",
+          "instructions": [
+            {
+              "id": "line-1",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+              "sourceRef": "demo-patients.json#/patients/9/care/plan/instructions/0"
+            },
+            {
+              "id": "line-2",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+              "sourceRef": "demo-patients.json#/patients/9/care/plan/instructions/1"
+            },
+            {
+              "id": "line-3",
+              "text": "Exercise: use the demonstration elbow movement in Rehab.",
+              "sourceRef": "demo-patients.json#/patients/9/care/plan/instructions/2"
+            },
+            {
+              "id": "line-4",
+              "text": "Schedule a check-in: request a time with the demo care team.",
+              "sourceRef": "demo-patients.json#/patients/9/care/plan/instructions/3"
+            }
+          ],
+          "approvedBy": "demo-clinician",
+          "demoOnly": true
+        },
+        "drafts": [],
+        "tasks": [
+          {
+            "id": "task-demo-010-1",
+            "patientId": "pat-demo-010",
+            "planId": "plan-demo-010",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+            "status": "completed",
+            "revision": 1,
+            "evidence": "patient_reported"
+          },
+          {
+            "id": "task-demo-010-2",
+            "patientId": "pat-demo-010",
+            "planId": "plan-demo-010",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-010-3",
+            "patientId": "pat-demo-010",
+            "planId": "plan-demo-010",
+            "planVersion": 1,
+            "title": "Exercise: use the demonstration elbow movement in Rehab.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-010-4",
+            "patientId": "pat-demo-010",
+            "planId": "plan-demo-010",
+            "planVersion": 1,
+            "title": "Schedule a check-in: request a time with the demo care team.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          }
+        ],
+        "help": [],
+        "acknowledgements": []
+      }
+    },
+    {
+      "id": "pat-demo-011",
+      "synthetic": true,
+      "firstName": "Nina",
+      "displayName": "Nina Shah",
+      "ageYears": 40,
+      "timezone": "America/New_York",
+      "careTeam": {
+        "id": "team-demo-2",
+        "clinicianName": "Casey Ellis",
+        "synthetic": true
+      },
+      "medications": [
+        {
+          "id": "med-demo-011",
+          "name": "Metformin hydrochloride",
+          "strength": "500 mg",
+          "dose": "1 tablet",
+          "route": "oral",
+          "times": [
+            "08:00",
+            "18:00"
+          ],
+          "withFood": true,
+          "synthetic": true
+        }
+      ],
+      "exercise": {
+        "exerciseId": "demo-elbow",
+        "title": "Demonstration elbow movement",
+        "tracking": "not_started",
+        "evidence": "none",
+        "synthetic": true
+      },
+      "checkIn": {
+        "status": "not_requested",
+        "preferredDate": "2026-11-10",
+        "booked": false,
+        "synthetic": true
+      },
+      "care": {
+        "contractVersion": "2.0.0",
+        "patientId": "pat-demo-011",
+        "plan": {
+          "id": "plan-demo-011",
+          "patientId": "pat-demo-011",
+          "version": 1,
+          "status": "approved",
+          "sourceText": "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\nMetformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal\nMetformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal\nExercise: use the demonstration elbow movement in Rehab.\nSchedule a check-in: request a time with the demo care team.",
+          "instructions": [
+            {
+              "id": "line-1",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+              "sourceRef": "demo-patients.json#/patients/10/care/plan/instructions/0"
+            },
+            {
+              "id": "line-2",
+              "text": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+              "sourceRef": "demo-patients.json#/patients/10/care/plan/instructions/1"
+            },
+            {
+              "id": "line-3",
+              "text": "Exercise: use the demonstration elbow movement in Rehab.",
+              "sourceRef": "demo-patients.json#/patients/10/care/plan/instructions/2"
+            },
+            {
+              "id": "line-4",
+              "text": "Schedule a check-in: request a time with the demo care team.",
+              "sourceRef": "demo-patients.json#/patients/10/care/plan/instructions/3"
+            }
+          ],
+          "approvedBy": "demo-clinician",
+          "demoOnly": true
+        },
+        "drafts": [],
+        "tasks": [
+          {
+            "id": "task-demo-011-1",
+            "patientId": "pat-demo-011",
+            "planId": "plan-demo-011",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 8:00 AM with a meal",
+            "status": "completed",
+            "revision": 1,
+            "evidence": "patient_reported"
+          },
+          {
+            "id": "task-demo-011-2",
+            "patientId": "pat-demo-011",
+            "planId": "plan-demo-011",
+            "planVersion": 1,
+            "title": "Metformin hydrochloride 500 mg · 1 tablet · 6:00 PM with a meal",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-011-3",
+            "patientId": "pat-demo-011",
+            "planId": "plan-demo-011",
+            "planVersion": 1,
+            "title": "Exercise: use the demonstration elbow movement in Rehab.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-011-4",
+            "patientId": "pat-demo-011",
+            "planId": "plan-demo-011",
+            "planVersion": 1,
+            "title": "Schedule a check-in: request a time with the demo care team.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          }
+        ],
+        "help": [],
+        "acknowledgements": []
+      }
+    },
+    {
+      "id": "pat-demo-012",
+      "synthetic": true,
+      "firstName": "Owen",
+      "displayName": "Owen Carter",
+      "ageYears": 60,
+      "timezone": "America/New_York",
+      "careTeam": {
+        "id": "team-demo-3",
+        "clinicianName": "Drew Lane",
+        "synthetic": true
+      },
+      "medications": [
+        {
+          "id": "med-demo-012",
+          "name": "Atorvastatin",
+          "strength": "10 mg",
+          "dose": "1 tablet",
+          "route": "oral",
+          "times": [
+            "20:00"
+          ],
+          "withFood": false,
+          "synthetic": true
+        }
+      ],
+      "exercise": {
+        "exerciseId": "demo-elbow",
+        "title": "Demonstration elbow movement",
+        "tracking": "not_started",
+        "evidence": "none",
+        "synthetic": true
+      },
+      "checkIn": {
+        "status": "not_requested",
+        "preferredDate": "2026-11-10",
+        "booked": false,
+        "synthetic": true
+      },
+      "care": {
+        "contractVersion": "2.0.0",
+        "patientId": "pat-demo-012",
+        "plan": {
+          "id": "plan-demo-012",
+          "patientId": "pat-demo-012",
+          "version": 1,
+          "status": "approved",
+          "sourceText": "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\nAtorvastatin 10 mg · 1 tablet · 8:00 PM\nExercise: use the demonstration elbow movement in Rehab.\nSchedule a check-in: request a time with the demo care team.",
+          "instructions": [
+            {
+              "id": "line-1",
+              "text": "Atorvastatin 10 mg · 1 tablet · 8:00 PM",
+              "sourceRef": "demo-patients.json#/patients/11/care/plan/instructions/0"
+            },
+            {
+              "id": "line-2",
+              "text": "Exercise: use the demonstration elbow movement in Rehab.",
+              "sourceRef": "demo-patients.json#/patients/11/care/plan/instructions/1"
+            },
+            {
+              "id": "line-3",
+              "text": "Schedule a check-in: request a time with the demo care team.",
+              "sourceRef": "demo-patients.json#/patients/11/care/plan/instructions/2"
+            }
+          ],
+          "approvedBy": "demo-clinician",
+          "demoOnly": true
+        },
+        "drafts": [],
+        "tasks": [
+          {
+            "id": "task-demo-012-1",
+            "patientId": "pat-demo-012",
+            "planId": "plan-demo-012",
+            "planVersion": 1,
+            "title": "Atorvastatin 10 mg · 1 tablet · 8:00 PM",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-012-2",
+            "patientId": "pat-demo-012",
+            "planId": "plan-demo-012",
+            "planVersion": 1,
+            "title": "Exercise: use the demonstration elbow movement in Rehab.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          },
+          {
+            "id": "task-demo-012-3",
+            "patientId": "pat-demo-012",
+            "planId": "plan-demo-012",
+            "planVersion": 1,
+            "title": "Schedule a check-in: request a time with the demo care team.",
+            "status": "pending",
+            "revision": 0,
+            "evidence": "unknown"
+          }
+        ],
+        "help": [],
+        "acknowledgements": []
+      }
+    }
+  ]
+}

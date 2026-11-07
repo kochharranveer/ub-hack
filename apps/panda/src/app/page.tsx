@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useCompanion, type Phase } from "./use-companion";
 import styles from "./panda.module.css";
+import { approvedMedicationTasks } from "./today-actions";
 const labels: Record<Phase, string> = {
   ready: "Ready when you are", listening: "Listening… tap to stop", thinking: "Thinking… tap to stop",
   confirmation: "Review your action below", saving: "Saving… tap to stop waiting",
@@ -24,7 +25,7 @@ export default function Panda() {
   const dialog = useRef<HTMLDialogElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
   const active = !["ready", "confirmation"].includes(c.phase);
-  const tasks = c.context?.tasks ?? [];
+  const medicines = approvedMedicationTasks(c.context);
   const plan = c.context?.plan;
   const engine = c.context?.aiEngine === "gemini" ? "Gemini" : c.context?.aiEngine === "openai" ? "OpenAI" : "Demo rules · no LLM";
   useEffect(() => {
@@ -44,6 +45,12 @@ export default function Panda() {
     setTyping(true);
     composer.current?.focus();
   }
+  function scheduleCheckIn() {
+    if (active) c.stop();
+    c.setText("I would like help scheduling a check-in with my care team.");
+    setTyping(true);
+    composer.current?.focus();
+  }
   return <div className={styles.app}>
     <div className={styles.topbar}>
       <button type="button" className={styles.emergency} onClick={() => setPanel("emergency")}><span aria-hidden="true">＋</span> Emergency</button>
@@ -54,17 +61,33 @@ export default function Panda() {
       {c.context ? c.context.mode === "fixture" ? "Fixture demo · actions are dry runs" : "Connected apps · synthetic demo" : "Loading your care context…"}
     </div>
     <section className={styles.greeting} aria-labelledby="welcome-title">
-      <h1 id="welcome-title">Hey there.</h1>
+      <h1 id="welcome-title">{c.context?.patient ? "Hey, " + c.context.patient.firstName + "." : "Hey there."}</h1>
       <p>Let’s take today one step at a time.</p>
     </section>
     <section className={styles.today} aria-labelledby="today-title">
       <div className={styles.sectionHeading}><h2 id="today-title">Today</h2><span className="pill">{plan ? "Approved plan · v" + plan.version : "No approved plan"}</span></div>
-      {!c.context ? <p className="muted">Getting your current tasks…</p> : !tasks.length ? <p className="muted">No tasks in the current context. Check your plan in Care.</p> :
-        <ol className={styles.tasks}>{tasks.slice(0, 3).map((task, index) => <li key={task.id}>
-          <span className={styles.taskNumber} aria-hidden="true">{task.status === "completed" ? "✓" : index + 1}</span>
-          <div><strong>{task.title}</strong><small>{task.status === "completed" ? "Completed · patient-reported" : "From your approved plan"}</small></div>
-          {task.status === "pending" && <button type="button" className={styles.reportButton} disabled={c.busy} onClick={() => void c.send("Confirm task " + task.id)}>Report done</button>}
-        </li>)}</ol>}
+      <ol className={styles.tasks}>
+        <li>
+          <span className={styles.taskNumber} aria-hidden="true">1</span>
+          <div><strong>Take medicines</strong>
+            {medicines.length ? <ul className={styles.medicines}>{medicines.map(task => <li key={task.id}>
+              <div><span>{task.title}</span><small>{task.status === "completed" ? "Completed · patient-reported" : "Exactly as listed in your approved plan"}</small></div>
+              {task.status === "pending" && <button type="button" className={styles.reportButton} disabled={c.busy} onClick={() => void c.send("Confirm task " + task.id)}>Report done</button>}
+            </li>)}</ul> : <small>{!c.context ? "Loading medicine details…" : "Medicine details pending in your approved plan."}</small>}
+          </div>
+          {!medicines.length && <a className={styles.actionLink} href="/care" onClick={c.stop}>View plan</a>}
+        </li>
+        <li>
+          <span className={styles.taskNumber} aria-hidden="true">2</span>
+          <div><strong>Exercise</strong><small>Open your demonstration exercise workspace.</small></div>
+          <a className={styles.actionLink} href="/rehab" onClick={c.stop}>Start ↗</a>
+        </li>
+        <li>
+          <span className={styles.taskNumber} aria-hidden="true">3</span>
+          <div><strong>Schedule check-in</strong><small>Request a time with your care team.<br />A request is not a booked appointment.</small></div>
+          <button type="button" className={styles.reportButton} disabled={c.busy || !plan || plan.status !== "approved"} onClick={scheduleCheckIn}>Request</button>
+        </li>
+      </ol>
       <button className={styles.refresh} type="button" disabled={c.refreshing || c.busy} onClick={() => void c.refresh()}>{c.refreshing ? "Refreshing…" : "↻ Refresh care status"}</button>
     </section>
     <section className={styles.voiceStage} aria-label="Talk to Panda">

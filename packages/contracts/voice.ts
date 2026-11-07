@@ -44,6 +44,7 @@ export type VoiceReply = {
 };
 // Additive Panda-only endpoint types; Care/Rehab v2 shapes remain unchanged.
 export type VoiceContext = {
+  patient?: { id: string; firstName: string; displayName: string; ageYears: number; synthetic: true };
   plan: import("./care").Plan | null;
   tasks: import("./care").Task[];
   help: import("./care").CareSnapshot["help"];

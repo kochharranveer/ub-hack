@@ -1,44 +1,16 @@
-import type { CareSnapshot } from "./care";
-export function fixtureCare(): CareSnapshot {
-  return {
-    contractVersion: "2.0.0",
-    patientId: "pat-demo-001",
-    plan: {
-      id: "plan-demo-001",
-      patientId: "pat-demo-001",
-      version: 1,
-      status: "approved",
-      sourceText:
-        "FICTIONAL DEMO ONLY. Use the demo movement to test the app. Contact the demo care team if you need help.",
-      instructions: [
-        {
-          id: "line-1",
-          text: "Use the demo movement to test the app.",
-          sourceRef: "demo.txt:1",
-        },
-        {
-          id: "line-2",
-          text: "Contact the demo care team if you need help.",
-          sourceRef: "demo.txt:2",
-        },
-      ],
-      approvedBy: "demo-clinician",
-      demoOnly: true,
-    },
-    drafts: [],
-    tasks: [
-      {
-        id: "task-demo-001",
-        patientId: "pat-demo-001",
-        planId: "plan-demo-001",
-        planVersion: 1,
-        title: "Review your demonstration plan",
-        status: "pending",
-        revision: 0,
-        evidence: "unknown",
-      },
-    ],
-    help: [],
-    acknowledgements: [],
-  };
+import dataset from "./demo-patients.json";
+import { CareSnapshotSchema, type CareSnapshot } from "./care";
+
+/** All apps share the same default synthetic patient. No clinical approval occurs here. */
+export function fixtureCare(patientId = dataset.defaultPatientId): CareSnapshot {
+  const patient = dataset.patients.find(patient => patient.id === patientId);
+  if (!patient) throw Error("Unknown synthetic fixture patient");
+  return CareSnapshotSchema.parse(structuredClone(patient.care));
+}
+export function demoPatientProfile(patientId: string) {
+  const patient = dataset.patients.find(patient => patient.id === patientId);
+  return patient ? {
+    id: patient.id, firstName: patient.firstName, displayName: patient.displayName,
+    ageYears: patient.ageYears, synthetic: true as const,
+  } : undefined;
 }
