@@ -3,7 +3,12 @@ import { CareSnapshotSchema } from "../contracts/care";
 import { ReportSchema } from "../contracts/rehab";
 import { fixtureCare } from "../contracts/fixtures";
 import { DomainError } from "./json-store";
-export const connected = () => process.env.PANDA_INTEGRATION === "connected";
+export const connected = () => {
+  const mode = process.env.PANDA_INTEGRATION;
+  if (mode && mode !== "connected" && mode !== "fixture")
+    throw new DomainError("NOT_CONFIGURED", "PANDA_INTEGRATION must be connected or fixture.", 503);
+  return mode === "connected";
+};
 export async function callPeer<T>(
   app: "care" | "rehab",
   route: string,

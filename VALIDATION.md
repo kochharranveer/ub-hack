@@ -1,21 +1,30 @@
 # Validation — November 7, 2026
 
-This describes the delivered v0.2 starter, not the finished clinical product.
+This records the Ranveer voice implementation on the v0.2 baseline. It is not clinical-product acceptance.
 
-| Check | Observed result |
-| --- | --- |
-| Workspace dependency installation / lock update | Passed (`npm install --no-audit --no-fund`) |
-| TypeScript across three apps, shared packages and tests | Passed |
-| Domain/provider-boundary tests | 20 passed; 0 failed |
-| Production builds | Care, Rehab and Panda passed; Panda rebuilt after the last provider change |
-| Connected HTTP integration | 15 checks passed through port-3000 gateway, including all app HTML/CSS, plan versions, voice confirmation, report save/retry, help/report acknowledgement and invalid writes |
-| Independent app operation | Panda, Care and Rehab each started alone and served explicit fixture context successfully |
-| Product diagram | SVG rendered to PNG and visually inspected |
-| Browser UI automation | Attempted; browser launch unavailable because Chromium is not installed. No successful UI automation or physical-device QA is claimed |
-| Live paid providers | Not run; Gemini/OpenAI/ElevenLabs need actual credentials. Adapter response/error parsing uses mocked tests |
-| Actual pose measurements | Not implemented; camera preview and explicitly simulated report only |
-| Production auth/database/deployment | Not implemented; synthetic demo identities, single-process local JSON stores, local-only servers |
+- `npm ci`: passed using the supplied lockfile; no new package dependency.
+- `npm run check`: passed, with TypeScript across all three apps and **38 tests, zero failures**.
+- `npm run build`: all three apps built. Panda was rebuilt after the final UI, confirmation and adapter changes.
+- `npm run test:integration`: **19 gateway checks passed**, including no write before confirmation, stable retry, resolved history, dismissal, stale-plan rejection, report save/retry, help/report acknowledgement and app assets.
+- Panda, Care and Rehab each started independently and returned explicit fixture context.
+- Browser QA succeeded on the actual local app. Tested sourced plan replies, keyboard entry, explicit fixture confirmation, accurate dry-run wording, saved conversation after reload, Emergency information dialog, and 390-pixel layout with no horizontal overflow.
+- Screenshots accompany the delivery. Responsive browser sizing is not a physical-device test.
+- `npm run voice:purge`: correctly handles an absent database; repository tests cover pruning populated/expired records.
+- `npm run test:providers:live`: intentionally stopped with a missing-configuration message. **No paid provider call or actual microphone recording is claimed.**
+- Provider HTTP requests/responses, malformed JSON, schema violations, rejection, cancellation, timeout and speech-body failure were tested with mocked fetch responses.
+- Authentication, production PostgreSQL, HTTPS hosting, actual pose inference and real clinician delivery remain pending.
 
-Reproduce checks: `npm ci`, `npm run check`, `npm run build`, `npm run test:integration`. Stop other servers on ports 3000–3002 first. The integration runner uses temporary storage and also tests each app in standalone fixture mode.
+Local runtime used Node 25.8.1 and npm 11.11.0. The committed Node floor is 22.13; CI selects Node 24. GitHub-hosted CI was configured but not remotely run during this delivery.
 
-Before claiming a hackathon-ready physical-AI demo, Yuvraj must implement real pose inference/counter, Ranveer must validate configured voice/AI, and all three must verify the complete loop on a real phone plus clinician browser. Record actual observations and build provenance in docs/DISCLOSURE.md.
+Reproduce from the repository root:
+
+```sh
+npm ci
+npm run check
+npm run build
+npm run test:integration
+```
+
+Stop other servers on ports 3000–3002 first. The integration runner isolates storage in temporary directories.
+
+See [Ranveer's handoff](docs/RANVEER_HANDOFF.md) for payload examples, storage/retention semantics, live provider setup, teammate reviews and the remaining implementation checklist.

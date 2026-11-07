@@ -1,0 +1,86 @@
+.root { max-width:none; padding:0; min-height:100dvh; }
+.app { max-width:600px; min-height:100dvh; margin:0 auto; padding:24px 28px calc(120px + env(safe-area-inset-bottom)); background:var(--card); border-left:1px solid var(--line); border-right:1px solid var(--line); }
+.topbar { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.topbar button { background:var(--bg); color:var(--ink); border:1px solid var(--line); padding:11px 12px; margin:0; font-size:12px; min-height:44px; border-radius:12px; }
+.topbar button span { margin-right:4px; }
+.brand { color:var(--ink); text-decoration:none; font-weight:750; font-size:22px; letter-spacing:-1px; }
+.brand span { font-weight:400; color:var(--muted); }
+.mode { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--muted); padding:17px 0; }
+.dot { width:6px; height:6px; border-radius:50%; background:var(--green); flex-shrink:0; }
+.greeting { margin:24px 0 26px; }
+.greeting h1 { font-size:clamp(36px,8vw,46px); margin:12px 0 8px; letter-spacing:-1.7px; line-height:1.1; }
+.greeting p { margin:0; color:var(--muted); font-size:15px; }
+.sectionHeading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.sectionHeading h2 { font-size:19px; margin:0; letter-spacing:-0.4px; }
+.sectionHeading :global(.pill) { margin:0; font-size:10px; }
+.sectionHeading small { text-align:right; overflow-wrap:anywhere; }
+.today { padding:20px 0 5px; border-top:1px solid var(--line); }
+.tasks { list-style:none; padding:0; margin:16px 0 0; }
+.tasks li { display:flex; gap:12px; align-items:center; padding:12px 0; }
+.taskNumber { background:var(--bg); color:var(--green); min-width:30px; height:30px; border-radius:50%; display:grid; place-items:center; font-size:12px; }
+.tasks li > div { flex:1; }
+.tasks strong { font-size:14px; font-weight:500; line-height:1.5; display:block; }
+.tasks small { display:block; margin-top:3px; font-size:11px; }
+.reportButton { background:var(--bg); color:var(--green); font-size:11px; padding:10px; margin:0; white-space:nowrap; min-height:44px; }
+.refresh { color:var(--muted); background:transparent; margin:2px 0 0 42px; padding:6px 0; font-size:11px; min-height:36px; }
+.voiceStage { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:38px 0 24px; }
+.talk { background:var(--bg); color:var(--ink); width:clamp(210px,58vw,280px); height:clamp(210px,58vw,280px); display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:50%; border:1px solid var(--line); margin:12px 0 10px; box-shadow:0 0 0 12px var(--bg),0 0 0 13px var(--line); transition:transform 0.2s ease; padding:24px; }
+.talk:hover { transform:scale(1.015); }
+.talk[data-active=true] { animation:breathe 2s ease-in-out infinite; }
+@keyframes breathe { 50% { box-shadow:0 0 0 19px var(--bg),0 0 0 20px var(--line); } }
+.face { width:75px; height:68px; display:block; margin-bottom:10px; }
+.face svg { width:100%; height:100%; }
+.talkHint { font-size:13px; font-weight:400; }
+.talk strong { font-size:32px; font-weight:500; letter-spacing:-1px; line-height:1.1; margin-top:3px; }
+.micIcon { font-size:16px; color:var(--green); margin-top:13px; }
+.voiceStatus { font-size:13px; color:var(--muted); margin:24px 0 5px; text-align:center; }
+.engine { font-size:10px; color:var(--muted); }
+.privacyButton { font-size:11px; color:var(--muted); background:transparent; text-decoration:underline; text-underline-offset:4px; margin:6px 0 0; padding:10px; min-height:36px; }
+.inputHint { max-width:260px; text-align:center; color:var(--muted); font-size:12px; margin-bottom:0; }
+.response { background:var(--bg); border:1px solid var(--line); border-radius:18px; padding:20px; margin:10px 0 20px; overflow-wrap:anywhere; }
+.reply { font-size:15px; line-height:1.75; white-space:pre-wrap; }
+.response small { font-size:11px; line-height:1.6; }
+.confirmation { padding-top:16px; margin-top:16px; border-top:1px solid var(--line); }
+.confirmation strong { font-size:13px; }
+.confirmation p { font-size:12px; color:var(--muted); }
+.confirmation button { font-size:12px; min-height:44px; }
+.playback { margin-top:12px; }
+.playback button { font-size:11px; margin:4px 4px 4px 0; padding:10px 12px; min-height:40px; }
+.playback small { display:block; }
+.composer { border:1px solid var(--line); border-radius:18px; padding:18px; margin:20px 0; }
+.composer label { font-weight:700; font-size:14px; margin:0 0 10px; }
+.closeComposer { font-size:22px; color:var(--muted); background:transparent; padding:0 8px; margin:0 0 10px; }
+.composer textarea { min-height:100px; resize:vertical; background:var(--card); font-size:15px; }
+.composeActions { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:8px; }
+.composeActions button { margin:0; min-height:44px; }
+.composeActions small { font-size:11px; line-height:1.6; }
+.quickActions { display:flex; justify-content:center; gap:8px; }
+.quickActions button { margin:4px 0; font-size:12px; min-height:44px; }
+.helpStatus { margin-top:22px; padding:18px; background:var(--warm); border-radius:16px; }
+.helpStatus h2 { font-size:16px; margin-top:0; }
+.helpStatus p { font-size:13px; overflow-wrap:anywhere; }
+.helpStatus a { font-size:12px; }
+.history { border-top:1px solid var(--line); margin-top:24px; padding-top:16px; font-size:12px; line-height:1.6; }
+.history summary { color:var(--muted); cursor:pointer; padding:6px 0; }
+.history ol { list-style:none; padding:0; max-height:300px; overflow:auto; }
+.history li { border-top:1px solid var(--line); padding:15px 0; overflow-wrap:anywhere; }
+.history p { white-space:pre-wrap; }
+.disclosure { font-size:10px; line-height:1.7; text-align:center; color:var(--muted); margin:24px 12px 0; }
+.dock { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:min(600px,100%); display:flex; justify-content:space-between; background:var(--card); border:1px solid var(--line); border-bottom:none; border-radius:20px 20px 0 0; padding:13px 22px calc(13px + env(safe-area-inset-bottom)); gap:16px; z-index:5; box-shadow:0 -8px 20px color-mix(in srgb,var(--ink) 4%,transparent); }
+.dock a,.dock button { flex:1; display:flex; align-items:center; justify-content:center; gap:12px; color:var(--ink); text-decoration:none; background:var(--bg); border:0; border-radius:12px; padding:12px; margin:0; font-size:13px; text-align:left; min-height:52px; }
+.dock span { font-size:23px; }
+.dock small { display:block; font-size:10px; margin-top:4px; font-weight:400; }
+.dialog { width:min(440px,calc(100% - 32px)); max-height:calc(100dvh - 50px); overflow:auto; border:1px solid var(--line); color:var(--ink); background:var(--card); border-radius:20px; padding:28px; }
+.dialog::backdrop { background:color-mix(in srgb,var(--ink) 45%,transparent); }
+.dialog h2 { font-size:25px; line-height:1.2; margin-top:18px; }
+.dialog p,.dialog label { font-size:13px; line-height:1.7; }
+.dialog button { min-height:44px; font-size:12px; }
+.dialogClose { display:block; margin:0 0 10px auto; padding:0; width:32px; min-height:32px !important; font-size:24px !important; background:var(--bg); color:var(--ink); }
+.notice { font-size:12px; padding:12px 16px; background:var(--warm); border-radius:12px; line-height:1.6; }
+.error { border:1px solid var(--ink); border-radius:14px; padding:16px; margin:14px 0; font-size:13px; }
+.error p { margin:8px 0; }
+.app button:disabled { cursor:not-allowed; }
+.app input:focus-visible,.app summary:focus-visible { outline:3px solid var(--green); outline-offset:3px; }
+@media(min-width:760px) { .app { margin-top:24px; margin-bottom:24px; min-height:calc(100dvh - 48px); border:1px solid var(--line); border-radius:24px; padding-left:40px; padding-right:40px; } .greeting { margin-top:32px; } .voiceStage { padding-top:42px; padding-bottom:30px; } }
+@media(max-width:420px) { .app { padding-left:20px; padding-right:20px; border:none; } .topbar button { padding:10px; font-size:11px; } .brand { font-size:20px; } .brand span { display:none; } .greeting { margin-top:18px; margin-bottom:22px; } .voiceStage { padding-top:28px; } .tasks strong { font-size:13px; } .reportButton { font-size:10px; padding:8px; } .dock { padding-left:16px; padding-right:16px; gap:12px; } }
+@media(prefers-reduced-motion:reduce) { .talk[data-active=true] { animation:none; } .talk { transition:none; } }

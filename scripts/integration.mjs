@@ -8,10 +8,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 for (const port of [3000, 3001, 3002])
   await new Promise((resolve, reject) => {
     const s = net.createServer();
-    s.once("error", () =>
+    s.once("error", (error) =>
       reject(
         Error(
-          `Port ${port} is occupied. Stop existing Panda servers before integration tests.`,
+          `Cannot listen on port ${port} (${error.code}). Stop existing Panda servers if it is occupied, or allow local networking.`,
         ),
       ),
     );
@@ -26,6 +26,7 @@ const proc = spawn(process.execPath, ["scripts/run.mjs", "start", "all"], {
     PANDA_DATA_DIR: dir,
     PANDA_INTEGRATION: "connected",
     PANDA_AI_MODE: "demo",
+    PANDA_TTS_MODE: "browser",
   },
 });
 let logs = "";
@@ -90,13 +91,21 @@ try {
   const initial = await api("/care/api/state");
   assert.equal(initial.plan.version, 1);
   checks++;
+  const context = await api("/api/context");
+  assert.equal(context.mode, "connected");
+  assert.equal(context.aiEngine, "demo_rules");
+  assert.equal(context.ttsEngine, "browser");
+  checks++;
   const turn = {
     requestId: "integration-help",
     text: "Please help me contact my care team",
   };
   const proposal = await api("/api/voice/turn", turn);
   assert.ok(proposal.proposalId);
+  assert.deepEqual(await api("/api/voice/turn", turn), proposal);
   assert.equal((await api("/care/api/state")).help.length, 0);
+  checks++;
+  await api("/api/voice/turn", { ...turn, text: "Changed payload" }, 409);
   checks++;
   const confirmation = await api("/api/voice/confirm", {
     proposalId: proposal.proposalId,
@@ -106,6 +115,15 @@ try {
   let state = await api("/care/api/state");
   assert.equal(state.help.length, 1);
   assert.equal(state.help[0].status, "open");
+  checks++;
+  const history = await api("/api/voice/history");
+  assert.equal(history.length, 1);
+  assert.match(history[0].reply.message, /not acknowledged/);
+  assert.equal(history[0].reply.proposalId, undefined);
+  const dismissed = await api("/api/voice/turn", { requestId: "integration-dismiss", text: "Please help with another question" });
+  await api("/api/voice/cancel", { proposalId: dismissed.proposalId });
+  await api("/api/voice/confirm", { proposalId: dismissed.proposalId });
+  assert.equal((await api("/care/api/state")).help.length, 1);
   checks++;
   await api("/care/api/help/" + state.help[0].id + "/ack", {
     requestId: "integration-ack-help",
@@ -171,6 +189,7 @@ try {
   });
   assert.equal((await api("/api/context")).plan.version, 1);
   checks++;
+  const staleProposal = await api("/api/voice/turn", { requestId: "integration-stale-proposal", text: "Please help with this plan" });
   await api("/care/api/plans/" + draft.id + "/approve", {
     requestId: "integration-approve",
     expectedCurrentVersion: 1,
@@ -178,6 +197,9 @@ try {
   assert.equal((await api("/api/context")).plan.version, 2);
   assert.equal((await api("/rehab/api/context")).plan.version, 2);
   assert.equal((await api("/care/api/reports"))[0].planVersion, 1);
+  checks++;
+  await api("/api/voice/confirm", { proposalId: staleProposal.proposalId }, 409);
+  assert.equal((await api("/care/api/state")).help.length, 1);
   checks++;
   await api(
     "/rehab/api/sessions",

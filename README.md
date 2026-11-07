@@ -1,5 +1,7 @@
 # Panda Care — three-app team starter, v0.2
 
+Latest Ranveer implementation: see [the voice handoff and remaining checklist](docs/RANVEER_HANDOFF.md) and [actual validation](VALIDATION.md).
+
 One phone/browser product, three independently runnable web apps. Responsibilities are split by complete product functions. This revision supersedes the previous single-app starter and contract v1.
 
 | Person | App | Owns the complete function | Standalone URL |
@@ -12,7 +14,7 @@ Every app includes its own UI, server routes, domain services and persistence. E
 
 ## Start the integrated product
 
-Node 22+ and npm. From the repository root:
+Node 22.13+ and npm (Node 24 selected by .nvmrc/CI). From the repository root:
 
 ```bash
 npm ci
@@ -22,7 +24,7 @@ npm run dev
 
 Open **http://localhost:3000**. `/` is Ranveer's app; `/care` and `/rehab` are proxied to the other two Next.js apps, including their assets and API routes. Use ordinary anchor navigation between zones. All apps remain separate build/deployment units; no copying React components between them, no iframes, no fourth product app.
 
-Defaults need no keys. Connected mode uses real local inter-app HTTP and JSON-file persistence; it does not mean connected to a real clinic. Browser microphone support varies; text is always available.
+Defaults need no keys. Connected mode uses real local inter-app HTTP, voice-owned SQLite, and Care/Rehab JSON-file persistence; it does not mean connected to a real clinic. Browser microphone support varies; text is always available.
 
 ## Work independently
 

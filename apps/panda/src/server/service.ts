@@ -1,219 +1,171 @@
 import { randomUUID } from "node:crypto";
 import {
-  TurnSchema,
-  ConfirmVoiceSchema,
-  type VoiceCommand,
-  type VoiceReply,
+  TurnSchema, ConfirmVoiceSchema, VoiceCommandSchema,
+  type VoiceCommand, type VoiceReply, type VoiceContext,
 } from "../../../../packages/contracts/voice";
 import type { CareSnapshot } from "../../../../packages/contracts/care";
-import {
-  JsonStore,
-  DomainError,
-  dataFile,
-  type Receipt,
-} from "../../../../packages/platform/json-store";
-import {
-  getCare,
-  callPeer,
-  connected,
-} from "../../../../packages/platform/peers";
-import { classify } from "./provider";
-type Proposal = {
-  id: string;
-  command: VoiceCommand;
-  planId: string;
-  planVersion: number;
-  expiresAt: number;
-  result?: VoiceReply;
-};
-type VoiceState = {
-  proposals: Proposal[];
-  turns: { text: string; reply: VoiceReply; at: string }[];
-  receipts: Record<string, Receipt>;
-};
+import { DomainError } from "../../../../packages/platform/json-store";
+import { getCare, callPeer, connected } from "../../../../packages/platform/peers";
+import { classify, providerStatus } from "./provider";
+import { speechStatus } from "./speech";
+import { SqliteVoiceRepository, voiceDatabaseFile, type VoiceRepository, type Proposal } from "./repository";
+
 export type CareBridge = {
   snapshot: () => Promise<CareSnapshot>;
   write: (path: string, body: unknown) => Promise<unknown>;
   mode: "connected" | "fixture";
 };
 export type Classifier = (
-  text: string,
-  care: CareSnapshot,
-) => Promise<{
-  command: VoiceCommand | null;
-  engine: "demo_rules" | "openai" | "gemini";
-}>;
+  text: string, care: CareSnapshot, signal?: AbortSignal,
+) => Promise<{ command: VoiceCommand | null; engine: VoiceReply["engine"] }>;
+
 export function voiceService(
-  file = dataFile("voice"),
+  file = voiceDatabaseFile(),
   bridge: CareBridge = {
     snapshot: getCare,
     write: (route, body) => callPeer("care", route, "POST", body),
     mode: connected() ? "connected" : "fixture",
   },
   classifier: Classifier = classify,
+  repository: VoiceRepository = new SqliteVoiceRepository(file),
+  now = Date.now,
 ) {
-  const db = new JsonStore<VoiceState>(file, () => ({
-    proposals: [],
-    turns: [],
-    receipts: {},
-  }));
   return {
-    async context() {
+    async context(): Promise<VoiceContext> {
       const c = await bridge.snapshot();
+      const provider = providerStatus();
+      const speech = speechStatus();
       return {
-        plan: c.plan,
-        tasks: c.tasks,
-        help: c.help,
-        mode: bridge.mode,
-        ttsEngine:
-          process.env.PANDA_TTS_MODE === "elevenlabs"
-            ? "elevenlabs"
-            : "browser",
+        plan: c.plan, tasks: c.tasks, help: c.help, mode: bridge.mode,
+        aiEngine: provider.engine, aiConfigured: provider.configured,
+        ttsEngine: speech.engine, ttsConfigured: speech.configured,
       };
     },
-    async turn(raw: unknown) {
+    async turn(raw: unknown, signal?: AbortSignal) {
       const v = TurnSchema.parse(raw);
-      const care = await bridge.snapshot();
-      if (!care.plan || care.plan.status !== "approved")
-        throw new DomainError("CONFLICT", "No approved plan is available");
-      return db.update(async (s) => {
-        const fingerprint = JSON.stringify(v),
-          prev = s.receipts[v.requestId];
-        if (prev) {
-          if (prev.fingerprint !== fingerprint)
-            throw new DomainError(
-              "CONFLICT",
-              "Request ID reused with different input",
-            );
-          return prev.result as VoiceReply;
+      return repository.transaction(async tx => {
+        const fingerprint = JSON.stringify(v);
+        const previous = tx.receipt(v.requestId);
+        if (previous) {
+          if (previous.fingerprint !== fingerprint)
+            throw new DomainError("CONFLICT", "Request ID reused with different input");
+          return previous.result;
         }
-        const { command, engine } = await classifier(v.text, care);
+        signal?.throwIfAborted();
+        const care = await bridge.snapshot();
+        if (!care.plan || care.plan.status !== "approved")
+          throw new DomainError("CONFLICT", "No approved plan is available");
+        const routed = await classifier(v.text, care, signal);
+        signal?.throwIfAborted();
+        const command = routed.command === null ? null : VoiceCommandSchema.parse(routed.command);
+        // Preserve the user's quote, never a model paraphrase.
+        if (command?.name === "request_help") command.args.quote = v.text;
         let reply: VoiceReply = {
-          mode: bridge.mode,
-          engine,
-          message:
-            "Try “show my plan”, “open exercise”, “request help”, or confirm one specific task. Panda cannot change treatment.",
+          mode: bridge.mode, engine: routed.engine,
+          message: "Try “show my plan”, “open exercise”, “request help”, or choose a task below. Panda cannot change treatment.",
         };
-        if (command?.name === "read_plan")
-          reply = {
-            ...reply,
-            message: care.plan!.instructions.map((i) => i.text).join("\n"),
-            sourceRefs: care.plan!.instructions.map((i) => i.sourceRef),
-          };
-        if (command?.name === "open_exercise")
-          reply = {
-            ...reply,
-            message:
-              "Open the exercise app below. This voice session stops during navigation.",
-            navigation: "/rehab",
-          };
-        if (
-          command?.name === "confirm_task" ||
-          command?.name === "request_help"
-        ) {
-          if (
-            command.name === "confirm_task" &&
-            !care.tasks.some(
-              (t) =>
-                t.id === command.args.taskId &&
-                t.revision === command.args.expectedRevision &&
-                t.status === "pending",
-            )
-          )
-            throw new DomainError(
-              "CONFLICT",
-              "Task is missing or has changed; refresh your plan",
-            );
+        if (command?.name === "read_plan") reply = {
+          ...reply, message: care.plan.instructions.map(i => i.text).join("\n"),
+          sourceRefs: care.plan.instructions.map(i => i.sourceRef),
+        };
+        if (command?.name === "open_exercise") reply = {
+          ...reply, message: "Open the exercise app below. Voice stops when you leave Panda.", navigation: "/rehab",
+        };
+        if (command?.name === "confirm_task" || command?.name === "request_help") {
+          if (command.name === "confirm_task" && !care.tasks.some(t =>
+            t.id === command.args.taskId && t.revision === command.args.expectedRevision &&
+            t.status === "pending" && t.planId === care.plan!.id &&
+            t.planVersion === care.plan!.version && t.patientId === care.patientId))
+            throw new DomainError("CONFLICT", "Task is missing or has changed; refresh your plan and ask again.");
           const proposal: Proposal = {
-            id: randomUUID(),
-            command,
-            planId: care.plan!.id,
-            planVersion: care.plan!.version,
-            expiresAt: Date.now() + 5 * 60 * 1000,
+            id: randomUUID(), command, patientId: care.patientId,
+            planId: care.plan.id, planVersion: care.plan.version,
+            expiresAt: now() + 5 * 60 * 1000, engine: routed.engine, mode: bridge.mode,
           };
-          s.proposals.push(proposal);
+          tx.saveProposal(proposal);
           reply = {
-            ...reply,
-            proposalId: proposal.id,
-            message:
-              command.name === "request_help"
-                ? "Send this request to the demonstration care team? “" +
-                  command.args.quote +
-                  "”"
-                : "Record your confirmation for “" +
-                  care.tasks.find(
-                    (t) => t.id === (command.args as { taskId: string }).taskId,
-                  )?.title +
-                  "”? This is patient-reported.",
+            ...reply, proposalId: proposal.id,
+            message: command.name === "request_help"
+              ? "Record this request for the demonstration care team? “" + v.text + "”"
+              : "Record your completion of “" + care.tasks.find(t => t.id === command.args.taskId)?.title + "”? This is patient-reported.",
           };
         }
-        s.turns.push({ text: v.text, reply, at: new Date().toISOString() });
-        s.turns = s.turns.slice(-50);
-        s.receipts[v.requestId] = { fingerprint, result: reply };
+        tx.saveTurn({ requestId: v.requestId, text: v.text, reply, at: new Date(now()).toISOString() }, fingerprint);
         return reply;
       });
     },
     async confirm(raw: unknown) {
       const v = ConfirmVoiceSchema.parse(raw);
-      return db.update(async (s) => {
-        const p = s.proposals.find((x) => x.id === v.proposalId);
-        if (!p) throw new DomainError("NOT_FOUND", "Proposal not found", 404);
+      // Persist the user's confirmation BEFORE crossing the HTTP boundary. A lost
+      // response can then be retried after the five-minute proposal window without
+      // creating a new action, as long as the same plan is still current.
+      const cached = await repository.transaction(tx => {
+        const p = tx.proposal(v.proposalId);
+        if (!p) throw new DomainError("NOT_FOUND", "Proposal not found. Ask Panda again.", 404);
         if (p.result) return p.result;
-        if (p.expiresAt < Date.now())
-          throw new DomainError(
-            "CONFLICT",
-            "Confirmation expired. Ask Panda again.",
-          );
+        if (p.mode !== bridge.mode)
+          throw new DomainError("CONFLICT", "Integration mode changed. Ask Panda for a new proposal.");
+        if (p.confirmedAt === undefined && p.expiresAt <= now())
+          throw new DomainError("CONFLICT", "Confirmation expired. Ask Panda again.");
+        p.confirmedAt ??= now();
+        tx.saveProposal(p);
+        return null;
+      });
+      if (cached) return cached;
+      return repository.transaction(async tx => {
+        const p = tx.proposal(v.proposalId);
+        if (!p) throw new DomainError("NOT_FOUND", "Proposal not found. Ask Panda again.", 404);
+        // A completed retry retains its result after plan changes or expiry.
+        if (p.result) return p.result;
+        if (p.mode !== bridge.mode)
+          throw new DomainError("CONFLICT", "Integration mode changed. Ask Panda for a new proposal.");
         const c = await bridge.snapshot();
-        if (c.plan?.id !== p.planId || c.plan.version !== p.planVersion)
-          throw new DomainError(
-            "CONFLICT",
-            "Plan changed. Review the new plan before confirming.",
-          );
-        const command = p.command;
+        if (c.plan?.status !== "approved" || c.patientId !== p.patientId ||
+            c.plan.id !== p.planId || c.plan.version !== p.planVersion)
+          throw new DomainError("CONFLICT", "Plan changed. Review the new plan and ask for a new confirmation.");
+        const command = VoiceCommandSchema.parse(p.command);
+        if (command.name !== "request_help" && command.name !== "confirm_task")
+          throw new DomainError("VALIDATION_ERROR", "This tool has no write action", 400);
         if (bridge.mode === "connected") {
-          if (command.name === "request_help")
-            await bridge.write("help", {
-              requestId: p.id,
-              quote: command.args.quote,
+          if (command.name === "request_help") {
+            await bridge.write("help", { requestId: p.id, quote: command.args.quote });
+          } else {
+            // Care owns the final revision check and idempotency. Retry the SAME
+            // payload after a lost response, even if Care already completed it.
+            await bridge.write("tasks/" + encodeURIComponent(command.args.taskId) + "/confirm", {
+              requestId: p.id, expectedRevision: command.args.expectedRevision, evidence: "patient_reported",
             });
-          else if (command.name === "confirm_task")
-            await bridge.write(
-              "tasks/" + encodeURIComponent(command.args.taskId) + "/confirm",
-              {
-                requestId: p.id,
-                expectedRevision: command.args.expectedRevision,
-                evidence: "patient_reported",
-              },
-            );
-          else
-            throw new DomainError(
-              "VALIDATION_ERROR",
-              "This tool has no write action",
-              400,
-            );
+          }
+        } else if (command.name === "confirm_task" && !c.tasks.some(t =>
+          t.id === command.args.taskId && t.revision === command.args.expectedRevision && t.status === "pending")) {
+          throw new DomainError("CONFLICT", "Task changed. Ask Panda for a new confirmation.");
         }
         p.result = {
-          mode: bridge.mode,
-          engine:
-            process.env.PANDA_AI_MODE === "openai"
-              ? "openai"
-              : process.env.PANDA_AI_MODE === "gemini"
-                ? "gemini"
-                : "demo_rules",
-          message:
-            bridge.mode === "fixture"
-              ? "Fixture action simulated; no care record was changed. Start all three apps for connected writes."
-              : command.name === "request_help"
-                ? "Request recorded. A clinician has not acknowledged it yet."
-                : "Patient-reported completion saved.",
+          mode: p.mode, engine: p.engine,
+          message: bridge.mode === "fixture"
+            ? "Dry run only. No Care record changed. Start all three apps for connected writes."
+            : command.name === "request_help"
+              ? "Request recorded. A clinician has not acknowledged it yet."
+              : "Patient-reported completion saved.",
         };
+        tx.saveProposal(p);
         return p.result;
       });
     },
-    async history() {
-      return (await db.snapshot()).turns;
+    async cancel(raw: unknown) {
+      const v = ConfirmVoiceSchema.parse(raw);
+      return repository.transaction(tx => {
+        const p = tx.proposal(v.proposalId);
+        if (!p) throw new DomainError("NOT_FOUND", "Proposal not found.", 404);
+        if (p.result) return p.result;
+        if (p.confirmedAt !== undefined)
+          throw new DomainError("CONFIRMATION_PENDING", "Confirmation was already submitted. Retry the same confirmation or check Care for its outcome.", 503);
+        p.result = { mode: p.mode, engine: p.engine, message: "Proposal dismissed. Check Care for the outcome of any confirmation you already submitted." };
+        tx.saveProposal(p);
+        return p.result;
+      });
     },
+    async history() { return repository.transaction(tx => tx.history()); },
   };
 }
 export const voice = voiceService();

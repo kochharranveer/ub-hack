@@ -4,6 +4,28 @@ import {
 } from "../../../../packages/contracts/voice";
 import type { CareSnapshot } from "../../../../packages/contracts/care";
 import { DomainError } from "../../../../packages/platform/json-store";
+import { z } from "zod";
+
+export function providerStatus() {
+  const mode = process.env.PANDA_AI_MODE || "demo";
+  if (!["demo", "gemini", "openai"].includes(mode))
+    throw new DomainError("NOT_CONFIGURED", "PANDA_AI_MODE must be demo, gemini, or openai.", 503);
+  const engine = mode === "demo" ? "demo_rules" as const : mode as "gemini" | "openai";
+  const configured = mode === "demo" || Boolean(mode === "gemini"
+    ? process.env.PANDA_GEMINI_API_KEY && process.env.PANDA_GEMINI_MODEL
+    : process.env.PANDA_OPENAI_API_KEY && process.env.PANDA_OPENAI_MODEL);
+  return { engine, configured };
+}
+const OpenAIResponse = z.object({ choices: z.array(z.object({ message: z.object({
+  tool_calls: z.array(z.object({ function: z.object({ name: z.string(), arguments: z.string() }) })).optional(),
+}) })).min(1) });
+const GeminiResponse = z.object({ candidates: z.array(z.object({ content: z.object({
+  parts: z.array(z.object({ functionCall: z.object({ name: z.string(), args: z.unknown().optional() }).optional() })),
+}) })).min(1) });
+async function providerJson<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
+  try { return schema.parse(await response.json()); }
+  catch { throw new DomainError("AI_INVALID_RESPONSE", "AI returned an incomplete or invalid response. Retry your request.", 503); }
+}
 export function demoCommand(
   text: string,
   care: CareSnapshot,
@@ -11,6 +33,7 @@ export function demoCommand(
   const lower = text.toLowerCase();
   if (/\b(help|contact|pain|discomfort)\b/.test(lower))
     return { name: "request_help", args: { quote: text } };
+  if (/\b(not|don't|haven't|never|cancel)\b/.test(lower)) return null;
   if (/\b(exercise|rehab)\b/.test(lower))
     return { name: "open_exercise", args: {} };
   if (/\b(confirm|completed|done)\b/.test(lower)) {
@@ -61,11 +84,13 @@ const fields = {
 export async function classify(
   text: string,
   care: CareSnapshot,
+  signal?: AbortSignal,
 ): Promise<{
   command: VoiceCommand | null;
   engine: "demo_rules" | "openai" | "gemini";
 }> {
-  if (process.env.PANDA_AI_MODE === "gemini") return geminiCommand(text, care);
+  providerStatus();
+  if (process.env.PANDA_AI_MODE === "gemini") return geminiCommand(text, care, signal);
   if (process.env.PANDA_AI_MODE !== "openai")
     return { command: demoCommand(text, care), engine: "demo_rules" };
   const key = process.env.PANDA_OPENAI_API_KEY,
@@ -109,7 +134,7 @@ export async function classify(
           { role: "user", content: text },
         ],
       }),
-      signal: AbortSignal.timeout(20000),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
     });
   } catch {
     throw new DomainError(
@@ -124,7 +149,7 @@ export async function classify(
       "AI provider rejected the request. Check server configuration.",
       503,
     );
-  const data = await response.json();
+  const data = await providerJson(response, OpenAIResponse);
   const calls = data.choices?.[0]?.message?.tool_calls;
   if (!calls?.length) return { command: null, engine: "openai" };
   if (calls.length !== 1)
@@ -150,6 +175,7 @@ export async function classify(
 async function geminiCommand(
   text: string,
   care: CareSnapshot,
+  signal?: AbortSignal,
 ): Promise<{ command: VoiceCommand | null; engine: "gemini" }> {
   const key = process.env.PANDA_GEMINI_API_KEY,
     model = process.env.PANDA_GEMINI_MODEL;
@@ -198,7 +224,7 @@ async function geminiCommand(
             },
           ],
         }),
-        signal: AbortSignal.timeout(20000),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
       },
     );
   } catch {
@@ -214,12 +240,10 @@ async function geminiCommand(
       "Gemini rejected the request. Check server configuration.",
       503,
     );
-  const result = await response.json();
+  const result = await providerJson(response, GeminiResponse);
   const calls = (result.candidates?.[0]?.content?.parts || [])
     .filter((p: { functionCall?: unknown }) => p.functionCall)
-    .map(
-      (p: { functionCall: { name: string; args: unknown } }) => p.functionCall,
-    );
+    .map(p => p.functionCall!);
   if (!calls.length) return { command: null, engine: "gemini" };
   if (calls.length !== 1)
     throw new DomainError(

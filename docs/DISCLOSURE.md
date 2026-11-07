@@ -9,3 +9,5 @@
 - Real team additions: Ranveer [commit IDs]; Asmita [commit IDs]; Yuvraj [commit IDs]. Fill with actual work, not projected features.
 - Validation: see `VALIDATION.md` for checks actually run. Record real phone/browser/model observations separately.
 - Clinical limits: no validated clinical decision support, real provider delivery or emergency dispatch. Demonstration measurements are not evidence of treatment efficacy.
+
+Ranveer implementation update (November 7, 2026): AI-assisted voice UI, SQLite repository, provider boundaries, tests and CI were added on branch ranveer/voice. See RANVEER_HANDOFF.md and the updated VALIDATION.md for actual evidence. Live provider/device tests remain pending; the source patch records the exact commit.

@@ -1,17 +1,9 @@
 import "@ui/theme.css";
-import { Shell } from "@ui/Shell";
+import styles from "./panda.module.css";
 export const metadata = {
-  title: "Panda · Panda",
-  description: "Synthetic-data three-app starter",
+  title: "Panda · Your care companion",
+  description: "Talk to Panda, see today's reviewed plan, and choose your next step. Synthetic demonstration.",
 };
 export default function Layout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        <Shell owner="Ranveer" app="panda">
-          {children}
-        </Shell>
-      </body>
-    </html>
-  );
+  return <html lang="en"><body><main className={styles.root}>{children}</main></body></html>;
 }

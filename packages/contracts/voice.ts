@@ -17,7 +17,7 @@ export const VoiceCommandSchema = z.discriminatedUnion("name", [
   z
     .object({
       name: z.literal("request_help"),
-      args: z.object({ quote: z.string().trim().min(1).max(2000) }).strict(),
+      args: z.object({ quote: z.string().min(1).max(2000).refine(s => Boolean(s.trim()), "Quote cannot be blank") }).strict(),
     })
     .strict(),
   z
@@ -27,7 +27,7 @@ export const VoiceCommandSchema = z.discriminatedUnion("name", [
 export const TurnSchema = z
   .object({
     requestId: z.string().min(8),
-    text: z.string().trim().min(1).max(2000),
+    text: z.string().min(1).max(2000).refine(s => Boolean(s.trim()), "Text cannot be blank"),
   })
   .strict();
 export const ConfirmVoiceSchema = z
@@ -41,4 +41,18 @@ export type VoiceReply = {
   proposalId?: string;
   navigation?: "/rehab";
   sourceRefs?: string[];
+};
+// Additive Panda-only endpoint types; Care/Rehab v2 shapes remain unchanged.
+export type VoiceContext = {
+  plan: import("./care").Plan | null;
+  tasks: import("./care").Task[];
+  help: import("./care").CareSnapshot["help"];
+  mode: VoiceReply["mode"];
+  aiEngine: VoiceReply["engine"];
+  aiConfigured: boolean;
+  ttsEngine: "browser" | "elevenlabs";
+  ttsConfigured: boolean;
+};
+export type VoiceHistoryTurn = {
+  requestId: string; text: string; reply: VoiceReply; at: string;
 };
