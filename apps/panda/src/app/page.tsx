@@ -6,48 +6,6 @@ import { approvedMedicationTasks } from "./today-actions";
 import styles from "./panda.module.css";
 import { VoiceCircle } from "./voice-circle";
 import RehabWorkspace from "../../../../packages/rehab-bridge/GuidedWorkspace";
-function PandaFace() {
-  return (
-    <svg viewBox="0 0 120 108" aria-hidden="true">
-      <circle cx="29" cy="28" r="18" fill="var(--ink)" />
-      <circle cx="91" cy="28" r="18" fill="var(--ink)" />
-      <ellipse
-        cx="60"
-        cy="59"
-        rx="48"
-        ry="43"
-        fill="var(--card)"
-        stroke="var(--line)"
-        strokeWidth="2"
-      />
-      <ellipse
-        cx="40"
-        cy="56"
-        rx="13"
-        ry="17"
-        transform="rotate(25 40 56)"
-        fill="var(--ink)"
-      />
-      <ellipse
-        cx="80"
-        cy="56"
-        rx="13"
-        ry="17"
-        transform="rotate(-25 80 56)"
-        fill="var(--ink)"
-      />
-      <circle cx="43" cy="54" r="4" fill="var(--card)" />
-      <circle cx="77" cy="54" r="4" fill="var(--card)" />
-      <path
-        d="M54 74 Q60 70 66 74 Q60 83 54 74 M60 80 Q52 89 48 82 M60 80 Q68 89 72 82"
-        fill="var(--ink)"
-        stroke="var(--ink)"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 function MicIcon() {
   return (
     <svg
@@ -98,19 +56,6 @@ function ArrowIcon() {
     </svg>
   );
 }
-function PlusIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      aria-hidden="true"
-    >
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
 function CloseIcon() {
   return (
     <svg
@@ -121,20 +66,6 @@ function CloseIcon() {
       aria-hidden="true"
     >
       <path d="m6 6 12 12M6 18 18 6" />
-    </svg>
-  );
-}
-function ShieldIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden="true"
-    >
-      <path d="m12 3 8 3v6c0 4-8 9-8 9s-8-5-8-9V6Z" />
-      <path d="M12 8v7m-3-3h6" />
     </svg>
   );
 }
@@ -251,12 +182,6 @@ export default function Panda() {
     }
     setMode("text");
     if (c.checkin?.stage !== "complete") void c.beginCheckin(false);
-  }
-  function prepare(text: string) {
-    c.stop();
-    c.setText(text);
-    setDirectDraft(true);
-    setMode("text");
   }
   async function memoryPanel() {
     setPanel("memory");
@@ -421,32 +346,6 @@ export default function Panda() {
   return (
     <div className={styles.app}>
       <div className={styles.surface}>
-        <div className={styles.topbar}>
-          <a className={styles.brand} href="/" aria-label="Panda home">
-            <span className={styles.brandMark}>
-              <PandaFace />
-            </span>
-            <span>
-              panda<small>your care companion</small>
-            </span>
-          </a>
-          <div className={styles.topActions}>
-            <button
-              type="button"
-              aria-label="Emergency information"
-              onClick={() => setPanel("emergency")}
-            >
-              <ShieldIcon />
-            </button>
-            <button
-              type="button"
-              aria-label="Contact care team"
-              onClick={() => prepare("I would like help from my care team. ")}
-            >
-              <PlusIcon />
-            </button>
-          </div>
-        </div>
         <section className={styles.today} aria-labelledby="today-title">
           <div className={styles.sectionHeading}>
             <h2 id="today-title">Your day, gently.</h2>
