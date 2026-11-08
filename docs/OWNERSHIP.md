@@ -47,9 +47,9 @@ A report acknowledgement is not a report edit. Asmita stores `{sessionId, by, at
 
 ## Production migration ownership
 
-Use one managed PostgreSQL instance if convenient, with separate domain schemas: `voice.*` (Ranveer), `care.*` (Asmita), `rehab.*` (Yuvraj). This is a proposed replacement for demo JSON files, not an implemented database. Each person writes their own migration and access policies; services do not write each other's tables. Reserve migration names by domain to avoid collisions. Shared identity/bootstrap migrations are coordinated by Ranveer. Do not expose database credentials to browsers.
+Use one managed PostgreSQL instance if convenient, with separate domain schemas: `voice.*` (Ranveer), `care.*` (Asmita), `rehab.*` (Yuvraj). The production setup implements private domain schemas with per-patient JSONB aggregates, row locks and forced RLS; local demo mode retains JSON/SQLite. See PRODUCTION_SETUP.md for scaling limits. Each person writes their own migration and access policies; services do not write each other's tables. Reserve migration names by domain to avoid collisions. Shared identity/bootstrap migrations are coordinated by Ranveer. Do not expose database credentials to browsers.
 
-For real accounts, Ranveer supplies verified identity/session helpers; every owner authorizes their own API operations and patient relationships. Fixed demo identities are not authorization. Care must split patient and clinician responses; the current synthetic `/state` response is deliberately not suitable for real patient access.
+For real accounts, Ranveer supplies verified identity/session helpers; every owner authorizes their own API operations and patient relationships. Fixed demo identities are not authorization; production uses verified Supabase users and explicit clinician grants. Care must split patient and clinician responses; the current synthetic `/state` response is deliberately not suitable for real patient access.
 
 ## Working rules
 

@@ -1,3 +1,6 @@
+import { productionEnabled } from "../../../../packages/platform/production/config";
+import { activePatient,identity as currentIdentity } from "../../../../packages/platform/production/context";
+import { PostgresVoiceRepository } from "./postgres-repository";
 import { randomUUID, createHash } from "node:crypto";
 import { PATIENT_ID } from "../../../../packages/contracts/common";
 import path from "node:path";
@@ -34,10 +37,11 @@ export function voiceService(
   repository: VoiceRepository = new SqliteVoiceRepository(file),
   now = Date.now,
   memory = new PatientMemoryRepository(path.join(path.dirname(file), "patient-memory.sqlite")),
-  identity: () => Promise<string> = async () => PATIENT_ID,
+  identity: () => Promise<string> = async () => productionEnabled()?activePatient():PATIENT_ID,
 ) {
   const repositories=new Map<string,VoiceRepository>([[PATIENT_ID,repository]]);
   function repositoryFor(patientId:string) {
+    if(productionEnabled())return new PostgresVoiceRepository(now);
     let scoped=repositories.get(patientId);
     if (!scoped) {scoped=new SqliteVoiceRepository(file+"."+createHash("sha256").update(patientId).digest("hex").slice(0,24)+".sqlite",now);repositories.set(patientId,scoped);}
     return scoped;
@@ -50,7 +54,8 @@ export function voiceService(
       const provider = providerStatus();
       const speech = speechStatus();
       return {
-        patient: demoPatientProfile(c.patientId),
+        patient: productionEnabled()?{id:c.patientId,firstName:currentIdentity().displayName.split(" ")[0]||"",displayName:currentIdentity().displayName,synthetic:false}:demoPatientProfile(c.patientId),
+        runtime:productionEnabled()?"production":"demo",
         plan: c.plan, tasks: c.tasks, help: c.help, mode: bridge.mode,
         aiEngine: provider.engine, aiConfigured: provider.configured,
         ttsEngine: speech.engine, ttsConfigured: speech.configured,
@@ -131,7 +136,7 @@ export function voiceService(
           reply = {
             ...reply, proposalId: proposal.id,
             message: command.name === "request_help"
-              ? "Record this request for the demonstration care team? “" + v.text + "”"
+              ? "Record this request for your care team to review? “" + v.text + "”"
               : "Record your completion of “" + care.tasks.find(t => t.id === command.args.taskId)?.title + "”? This is patient-reported.",
           };
         }

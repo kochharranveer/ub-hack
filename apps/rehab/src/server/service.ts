@@ -1,3 +1,6 @@
+import { domainStore } from "../../../../packages/platform/domain-store";
+import { productionEnabled } from "../../../../packages/platform/production/config";
+import { activePatient,actorId,identity,requireRole } from "../../../../packages/platform/production/context";
 import { randomUUID } from "node:crypto";
 import {
   StartSessionSchema,
@@ -13,10 +16,10 @@ import {
   type Receipt,
 } from "../../../../packages/platform/json-store";
 export function rehabService(file = dataFile("rehab")) {
-  const db = new JsonStore<{
+  const db = domainStore<{
     sessions: Session[];
     receipts: Record<string, Receipt>;
-  }>(file, () => ({ sessions: [], receipts: {} }));
+  }>("rehab",file, () => ({ sessions: [], receipts: {} }));
   return {
     async session(id: string) {
       const session=(await db.snapshot()).sessions.find(session=>session.id===id);
@@ -29,6 +32,7 @@ export function rehabService(file = dataFile("rehab")) {
       );
     },
     async start(raw: unknown, care: CareSnapshot) {
+      requireRole("patient");
       const v = StartSessionSchema.parse(raw);
       return db.update((s) =>
         once(s.receipts, v.requestId, { op: "start", ...v }, () => {
@@ -57,6 +61,7 @@ export function rehabService(file = dataFile("rehab")) {
       );
     },
     async finish(id: string, raw: unknown) {
+      requireRole("patient");
       const v = FinishSessionSchema.parse(raw);
       return db.update((s) =>
         once(s.receipts, v.requestId, { op: "finish", id, ...v }, () => {

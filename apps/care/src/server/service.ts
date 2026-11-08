@@ -1,3 +1,6 @@
+import { domainStore } from "../../../../packages/platform/domain-store";
+import { productionEnabled } from "../../../../packages/platform/production/config";
+import { activePatient,actorId,identity,requireRole } from "../../../../packages/platform/production/context";
 import { randomUUID } from "node:crypto";
 import {
   CareSnapshotSchema,
@@ -21,15 +24,17 @@ type State = {
   receipts: Record<string, Receipt>;
 };
 export function careService(file = dataFile("care")) {
-  const db = new JsonStore<State>(file, () => ({
-    care: fixtureCare(),
+  const db = domainStore<State>("care",file, () => ({
+    care: productionEnabled()?{contractVersion:"2.1.0",patientId:activePatient(),plan:null,drafts:[],tasks:[],help:[],acknowledgements:[]}:fixtureCare(),
     receipts: {},
   }));
   return {
     async snapshot() {
-      return CareSnapshotSchema.parse((await db.snapshot()).care);
+      const data=CareSnapshotSchema.parse((await db.snapshot()).care);
+      return productionEnabled()&&identity().role==="patient"?{...data,drafts:[]}:data;
     },
     async importPlan(raw: unknown) {
+      requireRole("clinician");
       const v = ImportPlanSchema.parse(raw);
       return db.update((s) =>
         once(s.receipts, v.requestId, { op: "import", ...v }, () => {
@@ -48,7 +53,7 @@ export function careService(file = dataFile("care")) {
               }))
               .filter((i) => i.text),
             approvedBy: null,
-            demoOnly: true as const,
+            demoOnly: !productionEnabled(),
           };
           s.care.drafts.push(draft);
           return draft;
@@ -56,6 +61,7 @@ export function careService(file = dataFile("care")) {
       );
     },
     async approve(id: string, raw: unknown) {
+      requireRole("clinician");
       const v = ApprovePlanSchema.parse(raw);
       return db.update((s) =>
         once(s.receipts, v.requestId, { op: "approve", id, ...v }, () => {
@@ -78,7 +84,7 @@ export function careService(file = dataFile("care")) {
             );
           // Demo clinician identity. Replace with verified clinician authorization before real use.
           draft.status = "approved";
-          draft.approvedBy = "demo-clinician";
+          draft.approvedBy = actorId("demo-clinician");
           s.care.plan = structuredClone(draft);
           s.care.drafts = s.care.drafts.filter((d) => d.id !== id);
           s.care.tasks = draft.instructions.map((i) => ({
@@ -96,6 +102,7 @@ export function careService(file = dataFile("care")) {
       );
     },
     async confirm(id: string, raw: unknown) {
+      requireRole("patient");
       const v = ConfirmTaskSchema.parse(raw);
       return db.update((s) =>
         once(s.receipts, v.requestId, { op: "confirm", id, ...v }, () => {
@@ -117,6 +124,7 @@ export function careService(file = dataFile("care")) {
       );
     },
     async help(raw: unknown) {
+      requireRole("patient");
       const v = CreateHelpSchema.parse(raw);
       return db.update((s) =>
         once(s.receipts, v.requestId, { op: "help", ...v }, () => {
@@ -134,6 +142,7 @@ export function careService(file = dataFile("care")) {
       );
     },
     async acknowledgeHelp(id: string, raw: unknown) {
+      requireRole("clinician");
       const v = RequestSchema.parse(raw);
       return db.update((s) =>
         once(s.receipts, v.requestId, { op: "ack-help", id }, () => {
@@ -141,12 +150,13 @@ export function careService(file = dataFile("care")) {
           if (!h)
             throw new DomainError("NOT_FOUND", "Help request not found", 404);
           h.status = "acknowledged";
-          h.acknowledgedBy = "demo-clinician";
+          h.acknowledgedBy = actorId("demo-clinician");
           return h;
         }),
       );
     },
     async acknowledgeReport(report: ExerciseReport, raw: unknown) {
+      requireRole("clinician");
       const v = RequestSchema.parse(raw);
       return db.update((s) =>
         once(
@@ -162,7 +172,7 @@ export function careService(file = dataFile("care")) {
             if (previous) return previous;
             const a = {
               sessionId: report.sessionId,
-              by: "demo-clinician",
+              by: actorId("demo-clinician"),
               at: new Date().toISOString(),
             };
             s.care.acknowledgements.push(a);

@@ -8,6 +8,7 @@ jobs:
     timeout-minutes: 15
     env:
       NEXT_TELEMETRY_DISABLED: 1
+      PANDA_RUNTIME: demo
       PANDA_AI_MODE: demo
       PANDA_TTS_MODE: browser
     steps:

@@ -1,3 +1,5 @@
+import { productionEnabled } from "./production/config";
+import { identity } from "./production/context";
 import { z } from "zod";
 import { CareSnapshotSchema } from "../contracts/care";
 import { ReportSchema } from "../contracts/rehab";
@@ -24,7 +26,7 @@ export async function callPeer<T>(
     response = await fetch(origin + "/" + app + "/api/" + route, {
       method,
       cache: "no-store",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json",...(productionEnabled()?{"Authorization":"Bearer "+identity().accessToken,"X-Panda-Patient":identity().patientId||""}:{}) },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(8000),
     });

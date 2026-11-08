@@ -16,22 +16,30 @@
     "build": "node scripts/run.mjs build all",
     "start": "node scripts/run.mjs start all",
     "typecheck": "tsc -p apps/panda && tsc -p apps/care && tsc -p apps/rehab && tsc -p tsconfig.tests.json",
-    "test": "node --import tsx --test tests/*.test.ts",
+    "test": "node scripts/test.mjs",
     "check": "npm run typecheck && npm test",
     "test:integration": "node scripts/integration.mjs",
     "test:providers:live": "node --import tsx scripts/provider-smoke.mjs",
     "voice:purge": "node --import tsx scripts/voice-purge.mjs",
     "seed:demo": "node scripts/generate-demo-patients.mjs",
-    "doctor": "node scripts/doctor.mjs"
+    "doctor": "node scripts/doctor.mjs",
+    "start:production": "node --import tsx scripts/production/start.mjs",
+    "db:migrate": "node --import tsx scripts/production/migrate.mjs",
+    "account:grant": "node --import tsx scripts/production/grant.mjs"
   },
   "dependencies": {
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.119.0",
     "next": "16.4.5",
+    "pg": "8.23.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.15",
     "@types/node": "^24.0.0",
+    "@types/pg": "8.23.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "tsx": "^4.20.0",

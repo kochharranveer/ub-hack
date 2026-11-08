@@ -1,5 +1,6 @@
+import { readJson } from "@platform/body";
 import { voice } from "@/server/service";
 import { respond } from "@platform/http";
 export function POST(req: Request) {
-  return respond(async () => voice.turn(await req.json(), req.signal));
+  return respond(async () => voice.turn(await readJson(req), req.signal), req);
 }

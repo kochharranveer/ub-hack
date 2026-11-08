@@ -1,4 +1,5 @@
 "use client";
+import { AccountMenu } from "../../../../packages/account-ui/AccountMenu";
 import { useEffect, useState } from "react";
 import type { CareSnapshot, ExerciseReport } from "@contracts";
 const sample =
@@ -20,7 +21,7 @@ export default function Care() {
     [status, setStatus] = useState(""),
     [reportError, setReportError] = useState(""),
     [busy, setBusy] = useState(false),
-    [clinician, setClinician] = useState(true);
+    [clinician, setClinician] = useState(false),[canClinician,setCanClinician]=useState(false);
   async function load() {
     setData(await api("state"));
     try {
@@ -32,6 +33,7 @@ export default function Care() {
   }
   useEffect(() => {
     void load().catch((e) => setStatus(e.message));
+    void api("access").then(access=>{const allowed=access.role==="clinician";setCanClinician(allowed);setClinician(allowed);}).catch(()=>{});
   }, []);
   async function act(path: string, body: object) {
     setBusy(true);
@@ -56,9 +58,9 @@ export default function Care() {
         Import instructions, review them, and approve the patient plan. The care
         team acknowledges requests and saved exercise reports here.
       </p>
-      <button className="secondary" onClick={() => setClinician(!clinician)}>
+      <AccountMenu/>{canClinician&&<button className="secondary" onClick={() => setClinician(!clinician)}>
         {clinician ? "Show patient plan" : "Show clinician workspace"}
-      </button>
+      </button>}
       <button
         className="secondary"
         onClick={() => void load().catch((e) => setStatus(e.message))}

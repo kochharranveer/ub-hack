@@ -1,3 +1,5 @@
+import { productionEnabled } from "../../../../packages/platform/production/config";
+import { postgresMemoryTransaction } from "./postgres-memory";
 import { DatabaseSync } from "node:sqlite";
 import { mkdir, chmod } from "node:fs/promises";
 import { createHash } from "node:crypto";
@@ -25,6 +27,7 @@ export const fingerprint = (value: unknown) => createHash("sha256").update(JSON.
 export class PatientMemoryRepository {
   constructor(readonly file = path.join(path.dirname(voiceDatabaseFile()), "patient-memory.sqlite")) {}
   transaction<T>(patientId: string, fn: (tx: MemoryTransaction) => T | Promise<T>): Promise<T> {
+    if(productionEnabled())return postgresMemoryTransaction(patientId,fn);
     const file = path.resolve(this.file);
     const work = (queues.get(file) ?? Promise.resolve()).then(async () => {
       await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });

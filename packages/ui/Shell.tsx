@@ -1,3 +1,5 @@
+import { productionEnabled } from "../platform/production/config";
+import { AccountMenu } from "../account-ui/AccountMenu";
 export function Shell({
   owner,
   app,
@@ -19,16 +21,15 @@ export function Shell({
           <a href="/rehab">Exercise</a>
         </nav>
         <small>
-          {owner} · {app}
+          {productionEnabled()?<AccountMenu/>:<>{owner} · {app}</>}
         </small>
       </header>
       <div className="notice">
-        Synthetic-data starter · Demo identities · Not connected to a healthcare
-        provider
+        {productionEnabled()?"Your care plan and reports · Doctor booking is pending":"Synthetic-data starter · Demo identities · Not connected to a healthcare provider"}
       </div>
       <main>{children}</main>
       <footer>
-        One product · Three independently runnable apps · Shared contract v2.0.0
+        One product · Three independently runnable apps · Shared contract v{productionEnabled()?"2.1.0":"2.0.0"}
       </footer>
     </>
   );

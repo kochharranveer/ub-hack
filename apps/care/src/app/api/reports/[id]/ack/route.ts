@@ -1,3 +1,4 @@
+import { readJson } from "@platform/body";
 import { care } from "@/server/service";
 import { getReports } from "@platform/peers";
 import { DomainError } from "@platform/json-store";
@@ -8,6 +9,6 @@ export function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
     const report = (await getReports()).find((r) => r.sessionId === id);
     if (!report)
       throw new DomainError("NOT_FOUND", "Saved report not found", 404);
-    return care.acknowledgeReport(report, await req.json());
-  });
+    return care.acknowledgeReport(report, await readJson(req));
+  }, req);
 }

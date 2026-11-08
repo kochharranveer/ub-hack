@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const nextBin = require.resolve("next/dist/bin/next");
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-if (existsSync(path.join(root, ".env.local")))
+if (process.env.PANDA_RUNTIME!=="production" && existsSync(path.join(root, ".env.local")))
   process.loadEnvFile(path.join(root, ".env.local"));
 const [command = "dev", selected = "all"] = process.argv.slice(2);
 if (
@@ -30,7 +30,7 @@ function stop(code = 0) {
     p.kill("SIGTERM");
     setTimeout(() => {
       if (p.exitCode === null && p.signalCode === null) p.kill("SIGKILL");
-    }, 3000).unref();
+    }, 20000).unref();
   }
   process.exitCode = code;
 }
@@ -38,13 +38,13 @@ process.on("SIGINT", () => stop());
 process.on("SIGTERM", () => stop());
 function run(app) {
   return new Promise((resolve) => {
-    const ports = { panda: 3000, care: 3001, rehab: 3002 };
+    const ports = { panda: command==="start"&&env.PANDA_RUNTIME==="production"?Number(env.PORT||3000):3000, care: 3001, rehab: 3002 };
     const args = [
       nextBin,
       command,
       ...(command === "build"
         ? []
-        : ["--hostname", "127.0.0.1", "--port", String(ports[app])]),
+        : ["--hostname", app==="panda"&&env.PANDA_RUNTIME==="production"?"0.0.0.0":"127.0.0.1", "--port", String(ports[app])]),
     ];
     const p = spawn(process.execPath, args, {
       cwd: path.join(root, "apps", app),

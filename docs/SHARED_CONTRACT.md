@@ -59,3 +59,7 @@ Local JSON persistence is serialized per file inside one Node process and writte
 This demo has no sign-in or clinical authorization. Production: verified same-origin session cookie, CSRF/origin checks for writes, scoped service-to-service credentials with actor/patient context, and domain-specific authorization in every API. Do not trust browser-supplied role/patient IDs. Restrict patient-visible snapshots; clinician drafts and private help notes must not leak. A shared cookie is not a substitute for server authorization.
 
 The contextual conversation extension adds `speechText?`, `confirmationPrompt?`, greeting/wellbeing-followup stages, optional continuation confirmation text, and patient-scoped transcript retrieval through the memory response. See [CONVERSATION_DESIGN.md](CONVERSATION_DESIGN.md). Existing Care/Rehab mutation payloads remain unchanged.
+
+## Production2.1.0 compatibility
+
+The production setup adds verified subject/patient access and accepts Care snapshots with contractVersion2.1.0 and boolean plan.demoOnly. Synthetic fixtures retain2.0.0/true. All three apps now accept both;2.0-only consumers must update before connecting production. Request/response field names, confirmation idempotency and the1.0.0 exercise bridge are unchanged.

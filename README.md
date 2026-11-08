@@ -1,5 +1,7 @@
 # Panda Care — three-app team starter, v0.2
 
+Production setup: [Supabase accounts, patient-scoped Postgres and Render](docs/PRODUCTION_SETUP.md).
+
 Latest conversation redesign: see [how Panda now converses](docs/CONVERSATION_DESIGN.md).
 
 Latest Ranveer implementation: see [the voice handoff and remaining checklist](docs/RANVEER_HANDOFF.md) and [actual validation](VALIDATION.md).
@@ -58,7 +60,7 @@ For cross-app navigation and integration, use `npm run dev` and port 3000. Stand
 
 **This is a working integration starter, not the completed care product.** Real pose inference/calibration/rep counting is Yuvraj's first major task. PDF/OCR extraction is pending. Gemini routing/memory retrieval and ElevenLabs TTS/STT passed live API checks using synthetic data; browser microphone/camera behavior and human audio playback need actual-device testing. Full-duplex ElevenLabs Agents is an optional upgrade; the supplied speech flow uses separate STT/model/TTS turns, not a realtime agent.
 
-Identities are fixed synthetic demo identities. Patient-scoped local repositories are tested, but there is no real authentication/authorization or durable production database, production job runner, actual clinician delivery, EHR connection, appointments, outbound calls, wearables, caregiver sharing, PWA/offline support or native app. A local JSON store supports one server process per app and is unsuitable for serverless replicas. Do not publish this demo with real patient data or paid unauthenticated endpoints.
+Local demo mode uses fixed synthetic identities and local JSON/SQLite. Production mode adds verified Supabase accounts, assigned clinician permissions, private Postgres storage, protected paid endpoints and Render deployment configuration. A production job runner, actual clinician delivery, EHR connection, appointments, outbound calls, wearables, caregiver sharing, PWA/offline support and native app remain separate work. See the production guide for account activation, backups, operational checks and clinical-release requirements.
 
 ## Optional AI and speech configuration
 
@@ -94,3 +96,5 @@ If the Classroom repo already contains starter files, clone it, copy this source
 Branches: `ranveer/voice`, `asmita/care`, `yuvraj/vision`. Merge contracts/scaffold first, then small working function slices. Root lock/config edits are serialized through Ranveer; Asmita maintains shared design tokens; Yuvraj maintains model assets. See `docs/OWNERSHIP.md` for all boundaries and deferred work.
 
 Read your guide: `docs/RANVEER.md`, `docs/ASMITA.md`, `docs/YUVRAJ.md`. Product diagram: `docs/PANDA_PRODUCT_DIAGRAM.svg`. Exact API contract: `docs/SHARED_CONTRACT.md`. Build order and demo: `docs/BUILD_ORDER.md` and `docs/DEMO_SCRIPT.md`. Track guidance: `docs/TRACK_STRATEGY.md`.
+
+Production accounts, database and Render deployment: see [PRODUCTION_SETUP.md](docs/PRODUCTION_SETUP.md). Demo remains the default; production requires verified Supabase accounts, restricted PostgreSQL credentials and HTTPS.

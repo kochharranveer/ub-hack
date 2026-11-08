@@ -1,4 +1,4 @@
 import { voice } from "@/server/service";
 import { respond } from "@platform/http";
 export const dynamic = "force-dynamic";
-export function GET() { return respond(() => voice.history()); }
+export function GET(req: Request) { return respond(() => voice.history(), req); }

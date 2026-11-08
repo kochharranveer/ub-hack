@@ -1,6 +1,6 @@
 import { care } from "@/server/service";
 import { respond } from "@platform/http";
 export const dynamic = "force-dynamic";
-export function GET() {
-  return respond(() => care.snapshot());
+export function GET(req: Request) {
+  return respond(() => care.snapshot(), req);
 }

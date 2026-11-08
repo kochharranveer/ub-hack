@@ -11,7 +11,7 @@ export const PlanSchema = z
     sourceText: z.string(),
     instructions: z.array(InstructionSchema),
     approvedBy: z.string().nullable(),
-    demoOnly: z.literal(true),
+    demoOnly: z.boolean(),
   })
   .strict();
 export const TaskSchema = z
@@ -38,7 +38,7 @@ export const HelpSchema = z
   .strict();
 export const CareSnapshotSchema = z
   .object({
-    contractVersion: z.literal("2.0.0"),
+    contractVersion: z.enum(["2.0.0","2.1.0"]),
     patientId: z.string(),
     plan: PlanSchema.nullable(),
     drafts: z.array(PlanSchema),

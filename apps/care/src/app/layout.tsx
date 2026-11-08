@@ -1,8 +1,9 @@
+export const dynamic="force-dynamic";
 import "@ui/theme.css";
 import { Shell } from "@ui/Shell";
 export const metadata = {
   title: "Panda · Care",
-  description: "Synthetic-data three-app starter",
+  description: "Your care plan and recovery companion",
 };
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (

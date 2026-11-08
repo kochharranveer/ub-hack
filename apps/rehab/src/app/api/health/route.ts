@@ -1,9 +1,3 @@
-export function GET() {
-  return Response.json({
-    ok: true,
-    app: "rehab",
-    owner: "Yuvraj",
-    contractVersion: "2.0.0",
-    mode: process.env.PANDA_INTEGRATION || "fixture",
-  });
-}
+import { health } from "@platform/production/health";
+export const dynamic="force-dynamic";
+export function GET(){return health("rehab");}

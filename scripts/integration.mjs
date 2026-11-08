@@ -25,6 +25,7 @@ const proc = spawn(process.execPath, ["scripts/run.mjs", "start", "all"], {
     ...process.env,
     PANDA_DATA_DIR: dir,
     PANDA_INTEGRATION: "connected",
+    PANDA_RUNTIME: "demo",
     PANDA_AI_MODE: "demo",
     PANDA_TTS_MODE: "browser",
   },
