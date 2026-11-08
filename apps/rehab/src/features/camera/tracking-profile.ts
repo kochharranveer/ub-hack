@@ -71,3 +71,12 @@ export function continuityAnchor(
   if (!Number.isFinite(scale) || scale <= 1e-8) return null;
   return { x: hip.x, y: hip.y, scale };
 }
+
+/** Explain the first missing required joint instead of silently stalling setup. */
+export function missingTrackingJoint(landmarks: readonly PoseLandmark[], profile: TrackingProfile): "hip" | "knee" | "ankle" | "shoulder" | undefined {
+  for (const index of profile.requiredJoints) {
+    const p=landmarks[index];
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1 || (p.visibility ?? 0) < profile.minimumVisibility || (p.presence ?? 1) < profile.minimumPresence)
+      return index === 23 || index === 24 ? "hip" : index === 25 || index === 26 ? "knee" : index === 27 || index === 28 ? "ankle" : "shoulder";
+  }
+}

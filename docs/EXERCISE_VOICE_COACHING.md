@@ -1,3 +1,5 @@
+> For the repaired start/calibration flow and current runtime camera adaptation, see [EXERCISE_FLOW_REPAIR.md](EXERCISE_FLOW_REPAIR.md).
+
 # Exercise voice coaching
 
 Panda stays inside `/exercise` while receiving feedback from Yuvraj's camera module. The existing Gemini analysis/calibration request now includes Panda's spoken-coaching style: one short, supported next step, plain language, no invented targets or treatment. The original measurement prompts and response schema are retained. Panda's server fetches the canonical analysis/cue by ID, verifies its patient, captured plan, session revision and freshness, then sends the validated wording through the existing ElevenLabs streaming path. It also retains the sourced observation in patient memory for subsequent conversation and post-exercise review.

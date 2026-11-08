@@ -1,3 +1,5 @@
+> For the repaired start/calibration flow and current runtime camera adaptation, see [EXERCISE_FLOW_REPAIR.md](EXERCISE_FLOW_REPAIR.md).
+
 # Latest Yuvraj source integration
 
 ## Preserved source

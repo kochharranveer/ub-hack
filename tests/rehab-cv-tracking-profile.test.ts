@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { continuityAnchor, exerciseTrackingProfile } from "../apps/rehab/src/features/camera/tracking-profile";
+import { continuityAnchor, exerciseTrackingProfile, missingTrackingJoint } from "../apps/rehab/src/features/camera/tracking-profile";
 import { measurePose, type PoseLandmark } from "../apps/rehab/src/features/exercise/geometry";
 
 function legOnly(side: "left" | "right" = "left"): PoseLandmark[] {
@@ -100,4 +100,12 @@ test("guided static quads has no pose prerequisites or camera connections", () =
   assert.deepEqual(profile.connections, []);
   assert.equal(continuityAnchor(legOnly(), profile), null);
   assert.match(profile.framingInstruction, /No camera tracking is required/);
+});
+
+test('an ankle outside the image produces an actionable framing explanation',()=>{
+ const points=legOnly();points[27]={...points[27],y:1.09};
+ assert.equal(missingTrackingJoint(points,exerciseTrackingProfile('seated-knee-extension','left')),'ankle');
+ assert.equal(measurePose(points,'left',640,480,{personCount:1}).valid,false);
+ points[27].y=.7;
+ assert.equal(missingTrackingJoint(points,exerciseTrackingProfile('seated-knee-extension','left')),undefined);
 });

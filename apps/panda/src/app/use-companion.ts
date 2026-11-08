@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { exerciseInstruction, type ExerciseRuntime } from "../../../../packages/contracts/exercise-runtime";
 import { requestsExercise } from "../../../../packages/contracts/exercise-navigation";
 import { recordedRecognition, speechInputMode } from "./recorded-recognition";
 import { spokenConfirmation } from "./voice-confirmation";
@@ -136,8 +137,10 @@ export function useCompanion() {
     route: string;
     checkinId?: string;
     expectedStage?: string;
+    exerciseContext?: ExerciseRuntime;
   } | null>(null);
   const inFlight = useRef(false);
+  const exerciseRuntime = useRef<ExerciseRuntime | undefined>(undefined);
   const settledPhase = () =>
     latestReply.current?.proposalId
       ? ("confirmation" as const)
@@ -336,7 +339,7 @@ export function useCompanion() {
     setPhase("thinking");
     setError("");
     setNotice("");
-    const openingExercise = requestsExercise(value);
+    const openingExercise = !exerciseRuntime.current && requestsExercise(value);
     const activeCheckin =
       !direct && !openingExercise ? checkinRef.current : undefined;
     const route = openingExercise
@@ -350,7 +353,7 @@ export function useCompanion() {
         text: value,
         route,
         ...(activeCheckin
-          ? { checkinId: activeCheckin.id, expectedStage: activeCheckin.stage }
+          ? { checkinId: activeCheckin.id, expectedStage: activeCheckin.stage, ...(exerciseRuntime.current ? {exerciseContext:exerciseRuntime.current} : {}) }
           : {}),
       };
     const input = pending.current;
@@ -384,10 +387,12 @@ export function useCompanion() {
       }
     } catch (e) {
       if (live.current && run === generation.current) {
-        handsfree.current = false;
-        microphone.current.close();
+        if (!exerciseRuntime.current) {
+          handsfree.current = false;
+          microphone.current.close();
+        }
         setPhase(settledPhase());
-        setError((e as Error).message);
+        setError(exerciseRuntime.current ? "Panda couldn't answer that question. Your set can continue using the exercise controls." : (e as Error).message);
       }
     } finally {
       if (run === generation.current) {
@@ -873,6 +878,9 @@ export function useCompanion() {
         // Camera/tracking updates must not interrupt a patient mid-sentence.
         if (result.exerciseCue) {
           if (epoch !== coachingEpoch.current) continue;
+          const position = result.exerciseCue.setupPosition;
+          const stage = exerciseRuntime.current?.stage;
+          if (position === "rest" && stage && stage !== "rest" || position === "comfortable_target" && stage && stage !== "target") continue;
           queuedCue.current = result;
           speakQueuedCue();
         } else if (
@@ -908,6 +916,29 @@ export function useCompanion() {
         );
     } finally {
       flushingFeedback.current = false;
+    }
+  }
+  function queueSetupGuidance() {
+    const state = exerciseRuntime.current, current = checkinRef.current;
+    if (!state || !current || current.stage !== "exercise" || ["paused", "saved"].includes(state.stage)) return;
+    queuedCue.current = {
+      mode: context?.mode || "connected", engine: "checkin_workflow", checkin: current,
+      message: exerciseInstruction(state),
+      exerciseCue: { eventId: "setup:"+state.exerciseId+":"+state.side+":"+state.stage, code: "EXERCISE_SETUP", expiresAt: new Date(Date.now()+30000).toISOString() },
+    };
+  }
+  function updateExerciseContext(state?: ExerciseRuntime) {
+    const previous = exerciseRuntime.current;
+    exerciseRuntime.current = state;
+    if (!state) { cancelExerciseCoaching(); return; }
+    if (state.stage !== previous?.stage || state.exerciseId !== previous?.exerciseId || state.side !== previous?.side || state.missingJoint !== previous?.missingJoint) {
+      if (queuedCue.current?.exerciseCue?.code === "EXERCISE_SETUP") queuedCue.current = null;
+      if (latestReply.current?.exerciseCue?.code === "EXERCISE_SETUP" && speaking.current) {
+        stopSound();
+        setPhase(settledPhase());
+      }
+      queueSetupGuidance();
+      if (!speakQueuedCue() && handsfree.current && !recognition.current && !inFlight.current) mic();
     }
   }
   function exerciseFeedback(event: RehabBridgeEvent) {
@@ -982,6 +1013,7 @@ export function useCompanion() {
       inFlight.current = false;
       if (forExercise && checkinRef.current) {
         handsfree.current = true;
+        queueSetupGuidance();
         if (!speakQueuedCue()) mic();
       } else await beginCheckin(true);
     } catch (e) {
@@ -1090,7 +1122,8 @@ export function useCompanion() {
       .then(() => {
         if (live.current && token === generation.current) {
           handsfree.current = true;
-          mic();
+          if (forExercise) queueSetupGuidance();
+          if (!forExercise || !speakQueuedCue()) mic();
         }
       })
       .catch(() => {
@@ -1159,6 +1192,7 @@ export function useCompanion() {
     openExercise,
     beginCheckin,
     exerciseFeedback,
+    updateExerciseContext,
     cancelExerciseCoaching,
     retryFeedback: () => {
       feedbackRetryAt.current = 0;

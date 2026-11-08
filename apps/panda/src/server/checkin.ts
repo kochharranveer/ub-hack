@@ -1,3 +1,4 @@
+import { routineExerciseTurn } from "../../../../packages/contracts/exercise-runtime";
 import { getGuidedSession,getGuidedFeedback,getGuidedAnalysis,GuidedAnalysisSchema,getGuidedCalibration,GuidedCalibrationSchema } from "../../../../packages/platform/guided-rehab";
 import { CvSessionSchema,CvFeedbackSchema,type CvSession,type CvFeedbackText } from "../../../../packages/contracts/rehab-cv";
 import { requestsExercise } from "../../../../packages/contracts/exercise-navigation";
@@ -12,7 +13,7 @@ import { getCare, callPeer, connected } from "../../../../packages/platform/peer
 import { approvedMedicationTasks } from "../app/today-actions";
 import { PatientMemoryRepository, patientMemory, fingerprint, type MemoryTransaction } from "./patient-memory";
 import { voice, type voiceService } from "./service";
-import {dialogueTurn,medicationLanguage,worseningConcern,patientQuestion,type DialogueModel,type Move,type Decision} from "./conversation";
+import {dialogueTurn,medicationLanguage,worseningConcern,symptomConcern,patientQuestion,type DialogueModel,type Move,type Decision} from "./conversation";
 import {demoPatientProfile} from "../../../../packages/contracts/fixtures";
 
 type Voice = ReturnType<typeof voiceService>;
@@ -96,7 +97,13 @@ export function checkinService(
     return [...new Map(values.map(value=>[value.id,value])).values()];
   }
   async function say(tx:MemoryTransaction,s:CheckinSession,care:CareSnapshot,id:string,base:VoiceReply,goal:string,text?:string,signal?:AbortSignal) {
-    const d=await model({care,session:s,history:tx.dialogue(),memory:reports(tx),text,moves:[{id:"respond",goal,fallback:base.message}]},signal);
+    let d:Decision;
+    try { d=await model({care,session:s,history:tx.dialogue(),memory:reports(tx),text,moves:[{id:"respond",goal,fallback:base.message}]},signal); }
+    catch(error) {
+      // Saving a canonical exercise report must not depend on conversational quota.
+      if(s.stage==="exercise_review" && error instanceof DomainError && ["AI_RATE_LIMITED","AI_UNAVAILABLE"].includes(error.code))return base;
+      throw error;
+    }
     return presented(s,base,d);
   }
   function requireSession(tx: MemoryTransaction,id: string,care: CareSnapshot) {
@@ -169,6 +176,7 @@ export function checkinService(
     if(s.concernPending)return reply(s,"Let's keep exercise on hold while we talk through your concern.",{pauseExercise:true});
     if(["exercise_review","pain_check"].includes(s.stage))return {...question(s,care),navigation:"/rehab"};
     if(s.stage!=="exercise"){
+      if(s.exerciseReviewed){s.exerciseSessionId=undefined;s.exerciseFeature=undefined;s.exerciseLabel=undefined;}
       if(["greeting","wellbeing_followup","medications","food","followup"].includes(s.stage))s.exerciseResumeStage=["greeting","wellbeing_followup"].includes(s.stage)?remaining(s):s.stage;
       s.stage="exercise";s.exerciseReviewed=false;
       event(tx,s,requestId,"checkin_review",text||"Opened guided exercise from the home action.",text?"patient_report":"client_observation",{topic:"exercise_navigation",unfinishedCheckinsPreserved:true});save(tx,s);
@@ -211,6 +219,11 @@ export function checkinService(
       }
       return once(v,{op:"answer",...v},signal,async(tx,care)=>{
         const s=requireSession(tx,v.checkinId,care);
+        if(s.stage==="exercise" && v.exerciseContext && !s.concernPending && !s.pendingProposalId && !symptomConcern(v.text)) {
+          if(v.expectedStage && v.expectedStage!==s.stage)throw new DomainError("CONFLICT","The conversation moved to another step. Resume it before answering.");
+          const routine=routineExerciseTurn(v.text,v.exerciseContext);
+          if(routine) { save(tx,s); return reply(s,routine.message,routine.control?{exerciseControl:{id:v.requestId,action:routine.control}}:{}); }
+        }
         if(requestsExercise(v.text))return enterExercise(tx,s,care,v.requestId,v.text);
         if(v.expectedStage&&s.stage!==v.expectedStage)throw new DomainError("CONFLICT","The conversation moved to another step. Resume it before answering.");
         if(s.agendaVersion!==2&&!s.pendingProposalId){s.agendaVersion=2;s.medicationTaskIds=medicationTasks(care).map(t=>t.id);s.medicationIndex=0;s.foodReviewed=false;s.followupReviewed=false;}
@@ -222,7 +235,7 @@ export function checkinService(
           {id:"question",goal:"Answer the patient's actual question from documented facts and attributed reports. If diagnosis/procedure is missing say so, without guessing or dumping instructions. Stay with their question; don't advance the check-in.",fallback:"I can help with what's in your plan, but I don't have a diagnosis or procedure recorded here. What would you like to know?"},
           {id:"chat",goal:"Respond briefly to a social/ambiguous turn. Do not close the call while routine topics are pending. If the patient says they have no questions or wants to move on, choose continue_checkin instead. Do not mark any check-in answered.",fallback:s.stage==="complete"?"I'm here. What would you like to talk about?":question(s,care).message},
           {id:"care_request",goal:"Acknowledge their explicit wish to contact the care team. Ask permission to record the exact concern for review, never claim delivery or acknowledgement.",fallback:"Would you like me to record that for your care team to review?"},
-          {id:"care_concern",goal:"Their pain is worsening or concerning. Put exercise and routine questions aside. Acknowledge it, suggest contacting their care team promptly, and ask permission to record their exact words for review. This app is not monitored, so don't imply this request replaces getting medical help.",fallback:"I'm sorry your elbow's getting worse. Let's pause the exercise and contact your care team promptly. Would you like me to record what you've told me for their review?"},
+          {id:"care_concern",goal:"Their pain is worsening or concerning. Put exercise and routine questions aside. Acknowledge it, suggest contacting their care team promptly, and ask permission to record their exact words for review. This app is not monitored, so don't imply this request replaces getting medical help.",fallback:"I'm sorry the pain is getting worse. Let's pause the exercise and contact your care team promptly. Would you like me to record what you've told me for their review?"},
           {id:"symptom_detail",goal:"Acknowledge the discomfort in their own words and ask ONE relevant follow-up about what changed or when it started. Pause routine check-in questions and don't diagnose or reassure.",fallback:/\bsullen\b/i.test(v.text)?"Did you mean your elbow is swollen?":"I'm sorry it's bothering you. What's changed since we last spoke?"},
         ];
         if(["greeting","wellbeing_followup"].includes(s.stage))moves.push({id:"wellbeing_answer",goal:"Acknowledge how they feel, then ASK the next routine question: "+goal(remaining(s))+". An older pending concern holds exercise, but does NOT cancel medicine, food or follow-up checks. Do not end with an open invitation instead of this question.",fallback:"Good to hear how you're doing. "+goal(remaining(s))});
@@ -244,7 +257,18 @@ export function checkinService(
         const resume=!patientQuestion(v.text)&&(/\b(?:let.s (?:go on|move on|continue)|go on|move on)\b/i.test(v.text)||["greeting","wellbeing_followup"].includes(s.stage)&&/\b(?:no (?:more |other )?questions|nothing else|(?:don.t|do not) (?:think I )?(?:have|need) anything else|thank you|thanks)\b/i.test(v.text));
         if(s.exerciseReviewed&&s.stage==="followup")for(const move of moves)if(["followup_preference","followup_declined"].includes(move.id)){move.goal="Acknowledge their preference without claiming a booking. Exercise was already reviewed. Briefly wrap up the completed check-in and invite remaining questions.";move.fallback="I've noted that. Booking is still pending. We've covered today's check-in—anything else on your mind?";}
         const allowed=worseningConcern(v.text)?moves.filter(m=>m.id==="care_concern") : wantsEnd&&moves.some(m=>m.id==="end_call")?moves.filter(m=>m.id==="end_call") : resume&&!["followup","complete","exercise"].includes(s.stage)&&!s.pendingProposalId?moves.filter(m=>m.id==="continue_checkin"):moves;
-        const d=await model({care,session:s,history:tx.dialogue(),memory:reports(tx),text:v.text,moves:allowed},signal);
+        let d:Decision;
+        try {
+          const concern = worseningConcern(v.text) ? allowed.find(move=>move.id==="care_concern") : undefined;
+          d = concern ? {move:concern.id,response:concern.fallback,foodQuote:null,engine:"checkin_workflow"} : await model({care,session:s,history:tx.dialogue(),memory:reports(tx),text:v.text,moves:allowed,exerciseContext:v.exerciseContext},signal);
+        }
+        catch(error) {
+          const reviewMove = !patientQuestion(v.text) && !/^(hi|hey|hello)\b/i.test(v.text.trim()) && s.stage==="exercise_review" ? moves.find(move=>move.id==="review") : s.stage==="pain_check" && /^(?:no|none|nope)\b/i.test(v.text.trim()) && !symptomConcern(v.text) ? moves.find(move=>move.id==="pain_none") : undefined;
+          if(reviewMove && error instanceof DomainError && ["AI_RATE_LIMITED","AI_UNAVAILABLE"].includes(error.code)) d={move:reviewMove.id,response:reviewMove.fallback,foodQuote:null,engine:"checkin_workflow"};
+          else if(s.stage==="exercise" && !symptomConcern(v.text) && error instanceof DomainError && error.code==="AI_RATE_LIMITED")
+            return reply(s,"I couldn't answer that question just now. You can still use the exercise controls.");
+          else throw error;
+        }
         if(!allowed.some(m=>m.id===d.move)||d.foodQuote&&!v.text.includes(d.foodQuote))throw new DomainError("VALIDATION_ERROR","Unsupported conversation decision or patient quote.",400);
         let base=question(s,care);
         if(d.foodQuote&&!["question","care_concern","symptom_detail","care_request"].includes(d.move)){
@@ -337,7 +361,7 @@ export function checkinService(
           const result=calibrationResult.result;if(tx.events("exercise_feedback",200).some(e=>e.metadata.calibrationId===calibrationResult.calibrationId))return question(s,current);
           event(tx,s,"guided-calibration:"+calibrationResult.calibrationId,"exercise_feedback",result.cue||"Calibration updated.","rehab_report",{calibrationId:calibrationResult.calibrationId,textSource:"gemini_calibration",detectedPosition:result.detectedPosition,angleDeg:result.angleDeg,confidence:result.confidence,exerciseId:calibrationResult.exerciseId,side:calibrationResult.side});
           if(!result.cue)return question(s,current);
-          return reply(s,result.cue,{exerciseCue:{eventId:calibrationResult.calibrationId,code:"GEMINI_CALIBRATION",expiresAt:new Date(Date.parse(calibrationResult.acceptedAt)+10000).toISOString()}});
+          return reply(s,result.cue,{exerciseCue:{eventId:calibrationResult.calibrationId,code:"GEMINI_CALIBRATION",setupPosition:result.detectedPosition,expiresAt:new Date(Date.parse(calibrationResult.acceptedAt)+10000).toISOString()}});
         }
         if(guided){
           const ref=guided.careReference;
@@ -350,7 +374,7 @@ export function checkinService(
           s.exerciseSessionId=guided.id;s.exerciseFeature="guided";s.exerciseLabel=guided.configuration.label;save(tx,s);
           if(v.event.type==="guided_report_saved"){
             const report=rememberGuided(tx,s,guided);if(report.terminationReason==="discomfort_reported")s.concernPending=true;s.stage="exercise_review";save(tx,s);
-            return say(tx,s,current,v.requestId,question(s,current),"The owner saved the "+guided.configuration.label+" report. "+(report.terminationReason==="discomfort_reported"?"They chose to stop for discomfort. Keep exercise on hold and ask what they felt. ":"")+"Its evidence is "+report.evidence+" and the targets are synthetic demonstration references, not a prescription or clinical validation. Acknowledge the actual evidence briefly, then ask how the exercise felt. Never call patient-reported holds camera verified.",undefined,signal);
+            return reply(s,(report.evidence==="simulated"?"That was a simulated set. ":"")+(report.terminationReason==="discomfort_reported"?"Let's leave exercise there. What did you feel?":"Your set is saved. How did that exercise feel?"));
           }
           if(analysisResult&&v.event.type==="guided_analysis"){
             if(analysisResult.batchSequence!==v.event.batchSequence||analysisResult.session.id!==guided.id||analysisResult.sessionControlRevision!==guided.sessionControlRevision||guided.status!=="running"||now()-Date.parse(analysisResult.acceptedAt)>10000)return question(s,current);

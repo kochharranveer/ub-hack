@@ -42,13 +42,14 @@ export type VoiceReply = {
   speechText?: string;
   confirmationPrompt?: boolean;
   pauseExercise?: boolean;
-  exerciseCue?:{eventId:string;code:string;expiresAt:string|null};
+  exerciseCue?:{eventId:string;code:string;expiresAt:string|null;setupPosition?:"rest"|"comfortable_target"|"transition"|"uncertain"};
   conversationEnded?: boolean;
   proposalId?: string;
   navigation?: "/rehab";
   sourceRefs?: string[];
   checkin?: { id: string; stage: "greeting" | "wellbeing_followup" | "medications" | "medication_confirmation" | "food" | "followup" | "readiness" | "exercise" | "exercise_review" | "pain_check" | "help_confirmation" | "complete" };
   exerciseSessionId?: string;
+  exerciseControl?: { id: string; action: import("./exercise-runtime").ExerciseControl };
 };
 // Additive Panda-only endpoint types; Care/Rehab v2 shapes remain unchanged.
 export type VoiceContext = {

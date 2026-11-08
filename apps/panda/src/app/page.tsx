@@ -176,6 +176,7 @@ export default function Panda() {
   }, [c.reply]);
   useEffect(() => {
     if (!exerciseOpen) {
+      c.updateExerciseContext(undefined);
       if (entryRequested.current) c.stop();
       entryRequested.current = false;
       return;
@@ -561,8 +562,10 @@ export default function Panda() {
         >
           <RehabWorkspace
             presentation="camera"
-            canStart={c.checkin?.stage === "exercise" && !c.busy}
+            canStart={c.checkin?.stage === "exercise" && !c.reply?.pauseExercise && !c.reply?.proposalId}
             onEvent={c.exerciseFeedback}
+            onRuntime={c.updateExerciseContext}
+            control={c.reply?.exerciseControl}
             onCoachingPause={c.cancelExerciseCoaching}
             onAskPanda={talk}
             pauseRequested={Boolean(c.reply?.pauseExercise)}
@@ -653,7 +656,7 @@ export default function Panda() {
                         })()
                       }
                     >
-                      Retry connection
+                      Retry Panda
                     </button>
                   </p>
                 )}

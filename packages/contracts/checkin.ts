@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ExerciseRuntimeSchema } from "./exercise-runtime";
 import type { VoiceReply } from "./voice";
 export type CheckinStage = NonNullable<VoiceReply["checkin"]>["stage"];
 const requestId = z.string().min(8).max(100);
@@ -7,6 +8,7 @@ export const OpenExerciseSchema = z.object({requestId,text:z.string().trim().min
 export const AnswerCheckinSchema = z.object({
   requestId, checkinId: z.string().uuid(), text: z.string().min(1).max(2000).refine(s => Boolean(s.trim())),
   expectedStage: z.enum(["greeting","wellbeing_followup","medications","medication_confirmation","food","followup","readiness","exercise","exercise_review","pain_check","help_confirmation","complete"]).optional(),
+  exerciseContext: ExerciseRuntimeSchema.optional(),
 }).strict();
 export const ContinueCheckinSchema = z.object({
   requestId, checkinId: z.string().uuid(), proposalId: z.string().uuid(),

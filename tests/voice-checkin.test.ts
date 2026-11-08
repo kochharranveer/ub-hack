@@ -313,3 +313,59 @@ test("a confirmation response cannot replace the next required question with gen
   let r=await x.start();r=await x.answer(r,"Yes");r=await x.confirm(r);
   assert.equal(r.checkin?.stage,"food");assert.match(r.message,/what.*eat.*\?/i);assert.equal(x.writes(),1);
 });
+
+test('exercise setup and spoken controls work without a conversation provider and preserve unfinished checks',async t=>{
+  let calls=0;
+  const x=await setup(t,async()=>{calls++;throw Error('Conversation provider unavailable');});
+  const opened=await x.checkin.openExercise({requestId:x.id()});
+  const exerciseContext={exerciseId:'seated-knee-extension',label:'Seated knee extension',side:'left',stage:'ready',completedReps:0,targetReps:10};
+  const input={requestId:x.id(),checkinId:opened.checkin!.id,expectedStage:'exercise',text:'start the set',exerciseContext};
+  const started=await x.checkin.answer(input);
+  assert.equal(started.exerciseControl?.action,'start');
+  assert.equal(started.exerciseControl?.id,input.requestId);
+  assert.deepEqual(await x.checkin.answer(input),started);
+  const greeting=await x.checkin.answer({...input,requestId:x.id(),text:'hello',exerciseContext:{...exerciseContext,stage:'framing'}});
+  assert.match(greeting.message,/left hip, knee and ankle/);
+  assert.equal(calls,0);
+  const memory=await x.checkin.memory();
+  assert.equal(memory.checkin?.stage,'exercise');
+  assert.equal(memory.checkin?.exerciseResumeStage,'medications');
+  assert.equal(memory.checkin?.foodReviewed,false);
+});
+
+test('a saved exercise report reaches review even when the conversational model is rate limited',async t=>{
+ const {DomainError}=await import('../packages/platform/json-store');
+ const x=await setup(t,async(input,signal)=>{
+   if(input.session.stage==='exercise_review')throw new DomainError('AI_RATE_LIMITED','quota unavailable',503);
+   return dialogueTurn(input,signal);
+ });
+ const ready=await x.ready();
+ const result=await x.exercise(ready);
+ assert.equal(result.reply.checkin?.stage,'exercise_review');
+ assert.match(result.reply.message,/feel/);
+ const memory=await x.checkin.memory();
+ assert.ok(memory.events.some(e=>e.kind==='exercise_report'));
+});
+
+test('a worsening-pain report holds exercise even when the conversational model is unavailable',async t=>{
+ const x=await setup(t,async()=>{throw Error('Model unavailable');});
+ const opened=await x.checkin.openExercise({requestId:x.id()});
+ const result=await x.checkin.answer({requestId:x.id(),checkinId:opened.checkin!.id,expectedStage:'exercise',text:'My knee pain is getting worse',exerciseContext:{exerciseId:'seated-knee-extension',label:'Seated knee extension',side:'left',stage:'running',completedReps:1,targetReps:10}});
+ assert.equal(result.pauseExercise,true);
+ assert.equal(result.checkin?.stage,'help_confirmation');
+ assert.doesNotMatch(result.speechText??'',/elbow/);
+ assert.equal((await x.checkin.memory()).checkin?.concernPending,true);
+});
+
+test('a reviewed set releases its session binding before the next set starts',async t=>{
+ const x=await setup(t);
+ const first=await x.exercise(await x.ready());
+ let r=await x.answer(first.reply,'It felt fine');
+ r=await x.answer(r,'No pain');
+ const opened=await x.checkin.openExercise({requestId:x.id()});
+ assert.equal(opened.checkin?.stage,'exercise');
+ assert.equal((await x.checkin.memory()).checkin?.exerciseSessionId,undefined);
+ const second=await x.exercise(opened);
+ assert.notEqual(second.session.id,first.session.id);
+ assert.equal((await x.checkin.memory()).events.filter(e=>e.kind==='exercise_report').length,2);
+});

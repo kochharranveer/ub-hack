@@ -463,3 +463,11 @@
   color: #e6eddd8f;
   pointer-events: none;
 }
+
+.referenceSteps { display: grid; gap: 8px; padding: 12px; margin-bottom: 10px; border: 1px solid #ffffff35; border-radius: 18px; background: #203335ba; text-align: center; }
+.referenceSteps span { font-size: 13px; }
+.referenceSteps button { border: 1px solid #ffffff55; border-radius: 22px; padding: 10px; color: #fffdf4; background: #657a78; cursor: pointer; }
+.referenceSteps button:disabled { opacity: .55; cursor: default; }
+.referenceSteps small { font-size: 10px; color: #eef3e4bc; }
+
+.reviewHint { font-size: 12px; text-align: center; color: #fffdf4c9; margin: 8px 0; }
