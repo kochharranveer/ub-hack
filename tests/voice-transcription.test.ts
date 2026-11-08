@@ -43,3 +43,11 @@ test("recorded microphone fallback releases a stream arriving after cancellation
     assert.equal(stopped,1);
   } finally {if(descriptor)Object.defineProperty(globalThis,"navigator",descriptor);else Reflect.deleteProperty(globalThis,"navigator");}
 });
+
+test("successful empty transcription is silence, while a missing transcript remains a provider error",async()=>{
+ const original=globalThis.fetch,old=process.env.PANDA_ELEVENLABS_API_KEY;process.env.PANDA_ELEVENLABS_API_KEY="fake-key";
+ try{
+  for(const text of ["","   \n "]){globalThis.fetch=async()=>Response.json({text});assert.equal(await transcribe(audio()),"");}
+  globalThis.fetch=async()=>Response.json({unexpected:"not a transcript"});await assert.rejects(()=>transcribe(audio()),error=>(error as {code:string}).code==="STT_UNAVAILABLE");
+ }finally{globalThis.fetch=original;if(old)process.env.PANDA_ELEVENLABS_API_KEY=old;else delete process.env.PANDA_ELEVENLABS_API_KEY;}
+});

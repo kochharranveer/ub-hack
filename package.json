@@ -29,7 +29,8 @@
     "cv:assets": "node scripts/cv-assets.mjs",
     "test:browser": "node scripts/test-browser.mjs",
     "verify:yuvraj": "node scripts/verify-yuvraj.mjs",
-    "test:yuvraj:integration": "node scripts/test-yuvraj-integration.mjs"
+    "test:yuvraj:integration": "node scripts/test-yuvraj-integration.mjs",
+    "test:voice:browser": "node scripts/test-voice-recovery.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.2.2",

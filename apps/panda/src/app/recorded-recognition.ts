@@ -46,7 +46,9 @@ export function recordedRecognition(transcribe:(audio:Blob,signal:AbortSignal)=>
             controller=new AbortController();processing();
             void transcribe(audio,controller.signal).then(text=>{
               if(!active)return;
-              port.onresult?.({results:{0:{0:{transcript:text}}}});
+              const transcript=text.trim();
+              if(transcript)port.onresult?.({results:{0:{0:{transcript}}}});
+              else port.onerror?.({error:"no-speech"});
               if(active){active=false;port.onend?.();}
             }).catch(error=>{
               if(active){active=false;port.onerror?.({error:"transcription-unavailable",message:error instanceof Error?error.message:"Speech transcription is unavailable."});port.onend?.();}

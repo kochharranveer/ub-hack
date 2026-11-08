@@ -106,9 +106,12 @@ export function pcmRecognition(
               )
                 .then((text) => {
                   if (!active) return;
-                  input.onresult?.({
-                    results: { 0: { 0: { transcript: text } } },
-                  });
+                  const transcript = text.trim();
+                  if (transcript)
+                    input.onresult?.({
+                      results: { 0: { 0: { transcript } } },
+                    });
+                  else input.onerror?.({ error: "no-speech" });
                   if (active) {
                     active = false;
                     input.onend?.();

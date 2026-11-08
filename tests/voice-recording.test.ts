@@ -54,3 +54,10 @@ test("recording failures release the microphone and identify the capture failure
   port.onerror=e=>{error=e.error;};port.start();t.after(()=>port.abort());await tick();x.recorder().onerror?.();
   assert.equal(error,"audio-capture");assert.equal(x.recorder().state,"inactive");assert.equal(x.counts().stopped,1);
 });
+
+test("an empty recorded transcript ends as no-speech without emitting patient words",async t=>{
+ const x=microphone(t);let error="",words=0,ended=0;
+ const port=recordedRecognition(async()=>" \n ",()=>{},()=>x.context);port.onresult=()=>{words++;};port.onerror=e=>{error=e.error;};port.onend=()=>{ended++;};
+ port.start();t.after(()=>port.abort());await tick();x.recorder().data();x.recorder().stop();await tick();
+ assert.equal(error,"no-speech");assert.equal(words,0);assert.equal(ended,1);assert.equal(x.counts().stopped,1);
+});

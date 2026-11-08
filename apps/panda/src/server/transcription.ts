@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { DomainError } from "../../../../packages/platform/json-store";
-const Transcript=z.object({text:z.string().trim().min(1).max(2000)});
+// A successful recognition request can contain no words (silence/background noise).
+// Preserve that result so the client can keep listening without inventing a turn.
+const Transcript=z.object({text:z.string().trim().max(2000)});
 export async function transcribe(form:FormData,signal?:AbortSignal) {
   if ([...form.keys()].some(key=>key!=="file")) throw new DomainError("VALIDATION_ERROR","Only a microphone audio file is accepted.",400);
   const file=form.get("file");

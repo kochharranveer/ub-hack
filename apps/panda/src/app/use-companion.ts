@@ -529,8 +529,12 @@ export function useCompanion() {
     rec.onresult = (e) => {
       if (recognition.current !== rec || !live.current) return;
       transcribing.current = false;
+      const transcript = e.results[0][0].transcript.trim();
+      if (!transcript) {
+        received = false;
+        return;
+      }
       received = true;
-      const transcript = e.results[0][0].transcript;
       if (
         duringSpeech &&
         playbackEcho(
@@ -562,7 +566,7 @@ export function useCompanion() {
       if (recognition.current !== rec || !live.current) return;
       // Silence is normal in a conversation. Keep waiting until the patient ends or mutes it.
       if (e.error === "no-speech" && handsfree.current) {
-        setPhase("listening");
+        if (!speaking.current) setPhase("listening");
         return;
       }
       failed = true;
