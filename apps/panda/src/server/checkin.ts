@@ -67,8 +67,9 @@ export function checkinService(
     const task=care.tasks.find(task=>task.id===s.medicationTaskIds[s.medicationIndex]);
     const medicine=task&&medicationLanguage(task,medicationTasks(care),s.medicationDetailsRequired?.includes(task.id));
     const first=demoPatientProfile(care.patientId)?.firstName;
-    const subject=/\belbow\b/i.test(care.plan?.sourceText||"")?"your elbow":"you";
-    if(s.stage==="greeting")return reply(s,`Hey${first?", "+first:""}, it's Panda. How ${subject==="you"?"are you feeling":"is "+subject+" feeling"} today?`);
+    const bodyPart=(care.plan?.sourceText||"").match(/\b((?:left |right )?(?:knee|elbow|hip|shoulder|ankle))\b/i)?.[1]?.toLowerCase();
+    const subject=bodyPart?"your "+bodyPart:"you";
+    if(s.stage==="greeting")return reply(s,`Hey${first?", "+first:""}, it's Panda. Let's do a quick recovery check-in. How ${subject==="you"?"are you feeling":"is "+subject+" feeling"} today?`);
     if(s.stage==="wellbeing_followup")return reply(s,s.concernPending?"Let's put the routine questions aside. What would you like to talk through?":"Can you tell me a little more about how it feels?");
     if(s.stage==="medications"&&medicine&&task&&s.medicationDetailsRequired?.includes(task.id))return reply(s,"Your plan now lists "+medicine.exact+". Have you taken that updated dose?");
     if(s.stage==="medications"&&medicine&&task?.status==="completed")return reply(s,"I have "+medicine.spoken+" recorded as taken earlier. Is that still right?");
@@ -87,6 +88,7 @@ export function checkinService(
   }
   function presented(s:CheckinSession,base:VoiceReply,d:Decision):VoiceReply {
     let response=d.response;
+    if(s.stage==="greeting"&&d.move==="respond"&&!s.concernPending&&!/check.?in/i.test(response))response=base.message;
     const advancing=["respond","wellbeing_answer","continue_checkin","med_yes","med_no","med_unsure","food_report","food_unchanged","followup_preference","followup_declined"];
     if(advancing.includes(d.move)&&["medications","food","followup","readiness"].includes(s.stage)&&!response.includes("?"))response=base.message;
     return {...base,engine:d.engine,checkin:{id:s.id,stage:s.stage},...(base.proposalId?{speechText:response,confirmationPrompt:["respond","med_yes","care_request","care_concern","pain_report"].includes(d.move)}:{message:response})};
@@ -101,7 +103,7 @@ export function checkinService(
     try { d=await model({care,session:s,history:tx.dialogue(),memory:reports(tx),text,moves:[{id:"respond",goal,fallback:base.message}]},signal); }
     catch(error) {
       // Saving a canonical exercise report must not depend on conversational quota.
-      if(s.stage==="exercise_review" && error instanceof DomainError && ["AI_RATE_LIMITED","AI_UNAVAILABLE"].includes(error.code))return base;
+      if(["greeting","exercise_review"].includes(s.stage) && error instanceof DomainError && ["AI_RATE_LIMITED","AI_UNAVAILABLE"].includes(error.code))return base;
       throw error;
     }
     return presented(s,base,d);
@@ -206,7 +208,7 @@ export function checkinService(
           else if(pending?.command.name==="request_help")base={...base,message:"Record this for care-team review? “"+pending.command.args.quote+"”"};
         }
         if(s.stage==="exercise")return reply(s,"I'm here. Would you like to continue your exercise, or talk about something else?");
-        return say(tx,s,care,v.requestId,base,s.stage==="greeting"?"Greet warmly as Panda, ask how the documented elbow/body part feels. If a prior concern is pending acknowledge it gently. No checklist, medicines, meals or booking at hello.":"Resume the actual unfinished topic naturally. Do not restart completed items or recite the plan. Pending action details remain in the visible proposal.",undefined,signal);
+        return say(tx,s,care,v.requestId,base,s.stage==="greeting"?"Greet warmly as Panda and offer a quick recovery check-in about the body part explicitly documented in the current plan; never assume an elbow. If a prior concern is pending acknowledge it gently. No checklist, medicines, meals or booking at hello.":"Resume the actual unfinished topic naturally. Do not restart completed items or recite the plan. Pending action details remain in the visible proposal.",undefined,signal);
       });
     },
     async answer(raw: unknown,signal?:AbortSignal) {
@@ -236,7 +238,7 @@ export function checkinService(
           {id:"chat",goal:"Respond briefly to a social/ambiguous turn. Do not close the call while routine topics are pending. If the patient says they have no questions or wants to move on, choose continue_checkin instead. Do not mark any check-in answered.",fallback:s.stage==="complete"?"I'm here. What would you like to talk about?":question(s,care).message},
           {id:"care_request",goal:"Acknowledge their explicit wish to contact the care team. Ask permission to record the exact concern for review, never claim delivery or acknowledgement.",fallback:"Would you like me to record that for your care team to review?"},
           {id:"care_concern",goal:"Their pain is worsening or concerning. Put exercise and routine questions aside. Acknowledge it, suggest contacting their care team promptly, and ask permission to record their exact words for review. This app is not monitored, so don't imply this request replaces getting medical help.",fallback:"I'm sorry the pain is getting worse. Let's pause the exercise and contact your care team promptly. Would you like me to record what you've told me for their review?"},
-          {id:"symptom_detail",goal:"Acknowledge the discomfort in their own words and ask ONE relevant follow-up about what changed or when it started. Pause routine check-in questions and don't diagnose or reassure.",fallback:/\bsullen\b/i.test(v.text)?"Did you mean your elbow is swollen?":"I'm sorry it's bothering you. What's changed since we last spoke?"},
+          {id:"symptom_detail",goal:"Acknowledge the discomfort in their own words and ask ONE relevant follow-up about what changed or when it started. Pause routine check-in questions and don't diagnose or reassure.",fallback:/\bsullen\b/i.test(v.text)?"Did you mean it is swollen?":"I'm sorry it's bothering you. What's changed since we last spoke?"},
         ];
         if(["greeting","wellbeing_followup"].includes(s.stage))moves.push({id:"wellbeing_answer",goal:"Acknowledge how they feel, then ASK the next routine question: "+goal(remaining(s))+". An older pending concern holds exercise, but does NOT cancel medicine, food or follow-up checks. Do not end with an open invitation instead of this question.",fallback:"Good to hear how you're doing. "+goal(remaining(s))});
         if(!s.pendingProposalId&&s.stage!=="exercise")moves.push({id:"continue_checkin",goal:"They have no more questions, thanked you, or asked to move on. Do not say goodbye. ASK this next required question: "+goal(remaining(s)),fallback:goal(remaining(s))});

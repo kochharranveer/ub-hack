@@ -43,9 +43,14 @@
           "synthetic": true
         }
       ],
+      "procedure": {
+        "name": "Left knee replacement surgery",
+        "side": "left",
+        "synthetic": true
+      },
       "exercise": {
-        "exerciseId": "demo-elbow",
-        "title": "Demonstration elbow movement",
+        "exerciseId": "seated-knee-extension",
+        "title": "Left seated knee extension demonstration",
         "tracking": "not_started",
         "evidence": "none",
         "synthetic": true
@@ -64,7 +69,7 @@
           "patientId": "pat-demo-001",
           "version": 1,
           "status": "approved",
-          "sourceText": "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\nAtorvastatin 10 mg · 1 tablet · 8:00 PM\nExercise: use the demonstration elbow movement in Rehab.\nSchedule a check-in: request a time with the demo care team.",
+          "sourceText": "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\nProcedure: left knee replacement surgery. Synthetic recovery scenario; no surgery date supplied.\nAtorvastatin 10 mg · 1 tablet · 8:00 PM\nExercise: left seated knee extension demonstration in Rehab.\nSchedule a check-in: request a time with the demo care team.",
           "instructions": [
             {
               "id": "line-1",
@@ -73,7 +78,7 @@
             },
             {
               "id": "line-2",
-              "text": "Exercise: use the demonstration elbow movement in Rehab.",
+              "text": "Exercise: left seated knee extension demonstration in Rehab.",
               "sourceRef": "demo-patients.json#/patients/0/care/plan/instructions/1"
             },
             {
@@ -102,7 +107,7 @@
             "patientId": "pat-demo-001",
             "planId": "plan-demo-001",
             "planVersion": 1,
-            "title": "Exercise: use the demonstration elbow movement in Rehab.",
+            "title": "Exercise: left seated knee extension demonstration in Rehab.",
             "status": "pending",
             "revision": 0,
             "evidence": "unknown"
@@ -148,6 +153,7 @@
           "synthetic": true
         }
       ],
+      "procedure": null,
       "exercise": {
         "exerciseId": "demo-elbow",
         "title": "Demonstration elbow movement",
@@ -254,6 +260,7 @@
           "synthetic": true
         }
       ],
+      "procedure": null,
       "exercise": {
         "exerciseId": "demo-elbow",
         "title": "Demonstration elbow movement",
@@ -375,6 +382,7 @@
           "synthetic": true
         }
       ],
+      "procedure": null,
       "exercise": {
         "exerciseId": "demo-elbow",
         "title": "Demonstration elbow movement",
@@ -496,6 +504,7 @@
           "synthetic": true
         }
       ],
+      "procedure": null,
       "exercise": {
         "exerciseId": "demo-elbow",
         "title": "Demonstration elbow movement",
@@ -626,6 +635,7 @@
           "synthetic": true
         }
       ],
+      "procedure": null,
       "exercise": {
         "exerciseId": "demo-elbow",
         "title": "Demonstration elbow movement",
@@ -747,6 +757,7 @@
           "synthetic": true
         }
       ],
+      "procedure": null,
       "exercise": {
         "exerciseId": "demo-elbow",
         "title": "Demonstration elbow movement",
@@ -868,6 +879,7 @@
           "synthetic": true
         }
       ],
+      "procedure": null,
       "exercise": {
         "exerciseId": "demo-elbow",
         "title": "Demonstration elbow movement",
@@ -998,6 +1010,7 @@
           "synthetic": true
         }
       ],
+      "procedure": null,
       "exercise": {
         "exerciseId": "demo-elbow",
         "title": "Demonstration elbow movement",
@@ -1119,6 +1132,7 @@
           "synthetic": true
         }
       ],
+      "procedure": null,
       "exercise": {
         "exerciseId": "demo-elbow",
         "title": "Demonstration elbow movement",
@@ -1240,6 +1254,7 @@
           "synthetic": true
         }
       ],
+      "procedure": null,
       "exercise": {
         "exerciseId": "demo-elbow",
         "title": "Demonstration elbow movement",
@@ -1360,6 +1375,7 @@
           "synthetic": true
         }
       ],
+      "procedure": null,
       "exercise": {
         "exerciseId": "demo-elbow",
         "title": "Demonstration elbow movement",

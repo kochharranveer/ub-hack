@@ -196,7 +196,7 @@ test("older food context remains retrievable after newer exercise feedback fills
 
 test("conversation opens with wellbeing and routine speech omits strength and clock time",async t=>{
   const x=await setup(t);let r=await x.greet();
-  assert.equal(r.checkin?.stage,"greeting");assert.match(r.message,/elbow.*feeling/i);assert.doesNotMatch(r.message,/atorvastatin|medication|food/i);
+  assert.equal(r.checkin?.stage,"greeting");assert.match(r.message,/left knee.*feeling/i);assert.match(r.message,/check-in/i);assert.doesNotMatch(r.message,/atorvastatin|medication|food/i);
   r=await x.answer(r,"I'm doing okay today.");
   assert.equal(r.checkin?.stage,"medications");assert.match(r.message,/evening.*atorvastatin/i);assert.doesNotMatch(r.message,/10 mg|8:00|tablet/);
   r=await x.answer(r,"Yes, I took it.");
@@ -368,4 +368,9 @@ test('a reviewed set releases its session binding before the next set starts',as
  const second=await x.exercise(opened);
  assert.notEqual(second.session.id,first.session.id);
  assert.equal((await x.checkin.memory()).events.filter(e=>e.kind==='exercise_report').length,2);
+});
+
+test('a fresh recovery greeting explicitly offers a knee check-in even when model wording omits it',async t=>{
+ const x=await setup(t,async()=>({move:'respond',response:'Hi. How are you today?',foodQuote:null,engine:'gemini'}));
+ const r=await x.greet();assert.equal(r.checkin?.stage,'greeting');assert.match(r.message,/recovery check-in/i);assert.match(r.message,/left knee/i);assert.doesNotMatch(r.message,/elbow/);
 });

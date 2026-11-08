@@ -23,7 +23,8 @@ const patients = firstNames.map((firstName, index) => {
   const clock = time => { const hour = Number(time.slice(0, 2)); return (hour % 12 || 12) + ":" + time.slice(3) + (hour >= 12 ? " PM" : " AM"); };
   const medicineTitles = medication.times.map(time =>
     medication.name + " " + medication.strength + " · " + medication.dose + " · " + clock(time) + (medication.withFood ? " with a meal" : ""));
-  const titles = [...medicineTitles, "Exercise: use the demonstration elbow movement in Rehab.", "Schedule a check-in: request a time with the demo care team."];
+  const exerciseTitle = index === 0 ? "Exercise: left seated knee extension demonstration in Rehab." : "Exercise: use the demonstration elbow movement in Rehab.";
+  const titles = [...medicineTitles, exerciseTitle, "Schedule a check-in: request a time with the demo care team."];
   const instructions = titles.map((text, i) => ({ id: "line-" + (i + 1), text, sourceRef: "demo-patients.json#/patients/" + index + "/care/plan/instructions/" + i }));
   const requested = index !== 0 && random() > 0.55;
   const tasks = titles.map((title, i) => {
@@ -40,12 +41,13 @@ const patients = firstNames.map((firstName, index) => {
     ageYears: 40 + Math.floor(random() * 36), timezone: "America/New_York",
     careTeam: { id: "team-demo-" + (index % clinicians.length + 1), clinicianName: clinicians[index % clinicians.length], synthetic: true },
     medications: [{ id: "med-demo-" + serial, ...medication, synthetic: true }],
-    exercise: { exerciseId: "demo-elbow", title: "Demonstration elbow movement", tracking: "not_started", evidence: "none", synthetic: true },
+    procedure: index === 0 ? { name: "Left knee replacement surgery", side: "left", synthetic: true } : null,
+    exercise: { exerciseId: index === 0 ? "seated-knee-extension" : "demo-elbow", title: index === 0 ? "Left seated knee extension demonstration" : "Demonstration elbow movement", tracking: "not_started", evidence: "none", synthetic: true },
     checkIn: { status: requested ? "requested" : "not_requested", preferredDate: "2026-11-" + String(9 + Math.floor(random() * 6)).padStart(2, "0"), booked: false, synthetic: true },
     care: {
       contractVersion: "2.0.0", patientId: id,
       plan: { id: planId, patientId: id, version: 1, status: "approved",
-        sourceText: "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\n" + titles.join("\n"),
+        sourceText: "FICTIONAL DEMO ONLY. Not a prescription or treatment recommendation.\n" + (index === 0 ? "Procedure: left knee replacement surgery. Synthetic recovery scenario; no surgery date supplied.\n" : "") + titles.join("\n"),
         instructions, approvedBy: "demo-clinician", demoOnly: true },
       drafts: [], tasks,
       help: requested ? [{ id: "help-demo-" + serial, patientId: id, quote: "I would like help scheduling a check-in with my care team.", status: "open", createdAt: "2026-11-07T15:00:00.000Z", acknowledgedBy: null }] : [],

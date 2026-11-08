@@ -1,6 +1,6 @@
 # Panda: changes since the Rehab navigation request
 
-Recorded: **8 November 2026**. Latest application-code commit covered: **`21cf7ac`** on `main`.
+Recorded: **8 November 2026**. Original application-code snapshot: **`21cf7ac`** on `main`; a later demo reset is recorded at the end.
 
 ## Scope and starting point
 
@@ -317,3 +317,11 @@ Care owns plans, tasks, requests, and acknowledgement records. Rehab owns exerci
 10. `21cf7ac` — repair calibration, start/control flow, voice context, counting/save/review, and subsequent-set handling.
 
 Local data cleanup and server restarts are operational changes and do not have source-code commits. This Markdown record is a later documentation addition covering the application changes above.
+
+## Follow-up: clean knee-recovery demo
+
+After the original change record, the local Panda demo patient stores were cleared at the user's request: persistent conversation/context, check-ins and receipts, Care state/requests/acknowledgements, and Rehab sessions/calibration/report records. API keys were preserved. This reset affected the local demo, not hosted Supabase or the separate doctor-portal service. Browser exercise-recovery data was cleared before reopening Panda.
+
+Alex's generated synthetic baseline now explicitly records a left knee replacement surgery and a matching left seated-knee-extension demonstration. No surgery date or clinical postoperative prescription was invented. Existing illustrative medication data remains labeled fictional. The recovery greeting explicitly offers a fresh check-in about the documented knee; routine conversation can use the stated procedure rather than claiming it is unknown or assuming an elbow. The checked-in generator produces this same baseline again, and integration identifiers remain stable.
+
+The updated check passes 196 tests, including the documented procedure, fresh pending tasks, knee-specific opening and explicit check-in wording. Existing old patient data and verification dialogue are excluded from source control.

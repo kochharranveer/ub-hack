@@ -51,3 +51,13 @@ test("medicine actions preserve exact approved task text and exclude stale or fo
   assert.deepEqual(approvedMedicationTasks(null), []);
   assert.deepEqual(approvedMedicationTasks({ ...c, plan: null }), []);
 });
+
+test("Alex has a documented synthetic knee replacement and a matching untouched exercise baseline",()=>{
+ const alex=dataset.patients.find(p=>p.id===dataset.defaultPatientId)!;
+ assert.match(alex.care.plan.sourceText,/Procedure: left knee replacement surgery/);
+ assert.doesNotMatch(alex.care.plan.sourceText,/elbow/i);
+ assert.equal(alex.exercise.exerciseId,'seated-knee-extension');
+ assert.equal(alex.exercise.tracking,'not_started');
+ assert.ok(alex.care.tasks.every(t=>t.status==='pending'&&t.revision===0));
+ assert.deepEqual(alex.care.help,[]);
+});

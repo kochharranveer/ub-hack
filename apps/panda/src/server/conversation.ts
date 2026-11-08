@@ -54,7 +54,10 @@ function demo(input:DialogueInput):Decision {
   if(s.stage==="complete"&&/\b(?:ready|start|do)\b.*\bexercise\b/i.test(text)&&!/\bnot\b/.test(text))choice="ready_yes";
   const move=input.moves.find(m=>m.id===choice)??input.moves[0];
   let response=move.fallback;
-  if(choice==="question"&&/\b(disease|diagnos|procedure|surgery|operation|got done)\b/i.test(text))response="I can see an elbow exercise in your plan, but your diagnosis or procedure isn't recorded here. I don't want to guess. What did your doctor tell you?";
+  if(choice==="question"&&/\b(disease|diagnos|procedure|surgery|operation|got done)\b/i.test(text)) {
+    const procedure=input.care.plan?.sourceText.match(/^Procedure:\s*(.+?)(?:\.|$)/mi)?.[1];
+    response=procedure?"Your demo plan records "+procedure+". I don't have a diagnosis recorded beyond that, so I won't guess.":"Your diagnosis or procedure isn't recorded here. I don't want to guess. What did your doctor tell you?";
+  }
   if(choice==="question"&&/\b(dose|strength|mg|time|when)\b/i.test(text)){
     const task=input.care.tasks.find(t=>t.id===s.medicationTaskIds[s.medicationIndex]);
     if(task)response="Your approved plan lists "+task.title+". I can help you check that, but I can't change the prescription.";
@@ -102,7 +105,8 @@ export const dialogueTurn:DialogueModel=async(input,signal)=>{
   const schema={type:"object",properties:{move:{type:"string",enum:allowed},response:{type:"string"},foodQuote:{type:["string","null"]}},required:["move","response","foodQuote"],additionalProperties:false};
   const data={currentTimeUtc:new Date().toISOString(),patientId:input.care.patientId,firstName:demoPatientProfile(input.care.patientId)?.firstName,stage:input.session.stage,agenda:{medicinesRemaining:input.session.medicationTaskIds.length-input.session.medicationIndex,foodReviewedThisCall:!!input.session.foodReviewed,followupReviewedThisCall:!!input.session.followupReviewed,exerciseHeld:!!input.session.concernPending},concernPending:input.session.concernPending,
     exerciseContext:input.exerciseContext??null,activeExerciseLabel:input.session.exerciseLabel??null,approvedPlan:input.care.plan,medicines:input.care.tasks.filter(t=>input.session.medicationTaskIds.includes(t.id)).map(t=>({...medicationLanguage(t,input.care.tasks,input.session.medicationDetailsRequired?.includes(t.id)),detailsRequired:input.session.medicationDetailsRequired?.includes(t.id),status:t.status})),
-    diagnosisOrProcedure:"There is no separate diagnosis/procedure field. Use only explicit statements in the approved plan; never infer a diagnosis or procedure from a medicine or exercise.",
+    documentedProcedure:input.care.plan?.sourceText.match(/^Procedure:\s*(.+?)(?:\.|$)/mi)?.[1]??null,
+    diagnosisOrProcedure:"Use explicit procedure statements in the approved plan when present. If absent, say it is not documented. Never infer a diagnosis or procedure from a medicine or exercise.",
     recentReports:input.memory.slice(0,24).map(e=>({kind:e.kind,quote:e.quote.slice(0,1000),at:e.at,source:e.source})),
     openCareRequests:input.care.help.filter(h=>h.status==="open").slice(-3),allowedMoves:input.moves.map(({id,goal})=>({id,goal})),latestPatientMessage:input.text??null};
   const bounded=signal?AbortSignal.any([signal,AbortSignal.timeout(20000)]):AbortSignal.timeout(20000);
