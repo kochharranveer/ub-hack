@@ -15,9 +15,9 @@ export async function health(app: "panda" | "care" | "rehab") {
       null,
       async (client) => {
         const out = await client.query(
-          "SELECT version FROM panda_platform.releases WHERE version='20261108_production'",
+          "SELECT version FROM panda_platform.releases WHERE version IN ('20261108_production','20261108_guided_rehab')",
         );
-        if (!out.rows.length) throw Error("migration missing");
+        if (out.rows.length!==2) throw Error("migration missing");
       },
     );
     if (app === "panda")

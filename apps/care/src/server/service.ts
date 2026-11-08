@@ -155,7 +155,7 @@ export function careService(file = dataFile("care")) {
         }),
       );
     },
-    async acknowledgeReport(report: ExerciseReport, raw: unknown) {
+    async acknowledgeReport(report: Pick<ExerciseReport,"sessionId"|"patientId">, raw: unknown) {
       requireRole("clinician");
       const v = RequestSchema.parse(raw);
       return db.update((s) =>

@@ -6,7 +6,8 @@ export async function consumeLimit(
   path: string,
   method: string,
 ) {
-  const provider =
+  const guidedGeneration=/^\/rehab\/api\/cv\/v1\/sessions\/[^/]+\/feedback\/[^/]+\/generate$/.test(path);
+  const provider = guidedGeneration ||
     /^\/api\/voice\/(?:turn|checkin\/(?:start|answer|continue)|speak|transcribe)$/.test(
       path,
     );

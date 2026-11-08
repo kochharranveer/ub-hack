@@ -25,9 +25,12 @@
     "doctor": "node scripts/doctor.mjs",
     "start:production": "node --import tsx scripts/production/start.mjs",
     "db:migrate": "node --import tsx scripts/production/migrate.mjs",
-    "account:grant": "node --import tsx scripts/production/grant.mjs"
+    "account:grant": "node --import tsx scripts/production/grant.mjs",
+    "cv:assets": "node scripts/cv-assets.mjs",
+    "test:browser": "node scripts/test-browser.mjs"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "1.2.2",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.119.0",
     "next": "16.4.5",
@@ -38,6 +41,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.15",
+    "@playwright/test": "1.65.0",
     "@types/node": "^24.0.0",
     "@types/pg": "8.23.1",
     "@types/react": "^19.0.0",

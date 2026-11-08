@@ -10,7 +10,7 @@ export async function transcribe(form:FormData,signal?:AbortSignal) {
   if (!key) throw new DomainError("NOT_CONFIGURED","ElevenLabs transcription is not configured. Use the keyboard.",503);
   const data=new FormData();
   data.set("model_id",process.env.PANDA_STT_MODEL||"scribe_v2");
-  data.set("file",file,"microphone."+(/mp4/.test(file.type)?"mp4":/mpeg/.test(file.type)?"mp3":"webm"));
+  data.set("file",file,"microphone."+(/mp4/.test(file.type)?"mp4":/mpeg/.test(file.type)?"mp3":/wav/.test(file.type)?"wav":"webm"));
   data.set("tag_audio_events","false");
   data.set("diarize","false");
   try {

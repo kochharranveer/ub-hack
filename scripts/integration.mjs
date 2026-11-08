@@ -41,7 +41,7 @@ const origin = "http://127.0.0.1:3000";
 async function api(url, body, status = 200) {
   const r = await fetch(origin + url, {
     method: body ? "POST" : "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Origin: origin },
     body: body ? JSON.stringify(body) : undefined,
   });
   assert.equal(r.status, status, await r.clone().text());
@@ -73,7 +73,7 @@ try {
   for (const [route, label] of [
     ["/", "Talk to Panda"],
     ["/care", "A clear plan."],
-    ["/rehab", "Exercise workspace"],
+    ["/rehab", "Every movement."],
   ]) {
     const r = await fetch(origin + route);
     assert.equal(r.status, 200);
@@ -261,6 +261,30 @@ try {
   assert.equal(memory.retention,"until_deleted");
   assert.ok(memory.events.some(event=>event.kind==="food" && event.quote==="Oatmeal and a banana"));
   assert.ok(memory.events.some(event=>event.kind==="exercise_report" && event.source==="rehab_report"));checks++;
+
+  // Yuvraj's new guided owner API uses the same patient and approved-plan context.
+  const cvContext=await api("/rehab/api/cv/v1/context");
+  assert.equal(cvContext.mode,"connected_demo");
+  assert.equal(cvContext.storageScope,initial.patientId);
+  guided=await api("/api/voice/checkin/start",{requestId:"cv-checkin-start"});
+  for(const text of ["My elbow feels okay","Yes already taken","Same food","Tomorrow","Yes"]){
+    guided=await api("/api/voice/checkin/answer",{requestId:crypto.randomUUID(),checkinId:guided.checkin.id,expectedStage:guided.checkin.stage,text});
+  }
+  assert.equal(guided.checkin.stage,"exercise");checks++;
+  const cv=await api("/rehab/api/cv/v1/sessions",{requestId:crypto.randomUUID(),exerciseId:"static-quads",side:"left",startedAtUtc:new Date().toISOString(),evidence:"patient_reported"});
+  assert.equal(cv.careReference.patientId,initial.patientId);
+  assert.equal(cv.careReference.planVersion,guidedPlan.version);
+  await api("/api/voice/exercise-feedback",{requestId:crypto.randomUUID(),checkinId:guided.checkin.id,event:{version:"1.0.0",type:"guided_session_started",sessionId:cv.id}});checks++;
+  const update=await api(`/rehab/api/cv/v1/sessions/${cv.id}/events`,{requestId:crypto.randomUUID(),event:{eventId:crypto.randomUUID(),sequence:1,observedOffsetMs:6000,type:"attempt_finalized",attemptId:crypto.randomUUID(),movementComplete:true,qualifying:true,holdMs:5000,targetReached:true,rangeDegrees:null}});
+  const cue=update.feedback[0];
+  const spokenCue=await api("/api/voice/exercise-feedback",{requestId:crypto.randomUUID(),checkinId:guided.checkin.id,event:{version:"1.0.0",type:"guided_feedback",sessionId:cv.id,feedbackId:cue.eventId}});
+  assert.equal(spokenCue.exerciseCue.eventId,cue.eventId);checks++;
+  await api(`/rehab/api/cv/v1/sessions/${cv.id}/finish`,{requestId:crypto.randomUUID(),lastMeasurementSequence:1,report:{observedEndedAtUtc:new Date().toISOString(),completionStatus:"incomplete",terminationReason:"finished",timing:{elapsedTimeMs:6000,activeTimeMs:0,pausedTimeMs:6000,userPausedTimeMs:0,trackingPausedTimeMs:6000,otherPausedTimeMs:0,guidedTimerMs:5000}}});
+  guided=await api("/api/voice/exercise-feedback",{requestId:crypto.randomUUID(),checkinId:guided.checkin.id,event:{version:"1.0.0",type:"guided_report_saved",sessionId:cv.id}});
+  assert.equal(guided.checkin.stage,"exercise_review");
+  assert.equal((await api("/care/api/guided-reports"))[0].sessionId,cv.id);
+  await api(`/care/api/reports/${cv.id}/ack`,{requestId:crypto.randomUUID()});
+  assert.ok((await api("/care/api/state")).acknowledgements.some(ack=>ack.sessionId===cv.id));checks++;
 
   console.log(
     `PASS: ${checks} integrated checks across three built apps, one gateway origin, versioned plans, voice confirmation, reports, acknowledgement and assets.`,

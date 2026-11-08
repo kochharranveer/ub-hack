@@ -79,12 +79,13 @@ export async function patientTransaction<T>(
     fn(client, patient),
   );
 }
-export type Domain = "care" | "rehab" | "voice";
+export type Domain = "care" | "rehab" | "voice" | "cv";
 const tables = {
   care: "care.patient_state",
   rehab: "rehab.patient_state",
   voice: "voice.patient_state",
   memory: "voice.patient_memory",
+  cv: "rehab.cv_state",
 } as const;
 export class PostgresStore<T> {
   constructor(

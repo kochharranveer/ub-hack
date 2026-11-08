@@ -1,4 +1,4 @@
-/** One input device per active call. Recording still stops while Panda speaks. */
+/** One input device per active call. Echo-cancelled input can remain available during Panda speech. */
 export class ConversationMicrophone {
   private stream:MediaStream|null=null;
   private pending:Promise<MediaStream>|null=null;

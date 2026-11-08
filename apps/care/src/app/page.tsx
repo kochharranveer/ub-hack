@@ -1,6 +1,7 @@
 "use client";
 import { AccountMenu } from "../../../../packages/account-ui/AccountMenu";
 import { useEffect, useState } from "react";
+import type { CvReport } from "../../../../packages/contracts/rehab-cv";
 import type { CareSnapshot, ExerciseReport } from "@contracts";
 const sample =
   "FICTIONAL DEMONSTRATION PLAN\nReview your discharge instructions with the demonstration care team.\nTry the demo exercise only to test the software.";
@@ -17,6 +18,7 @@ async function api(path: string, body?: unknown) {
 export default function Care() {
   const [data, setData] = useState<CareSnapshot | null>(null),
     [reports, setReports] = useState<ExerciseReport[]>([]),
+    [guidedReports,setGuidedReports]=useState<CvReport[]>([]),
     [text, setText] = useState(sample),
     [status, setStatus] = useState(""),
     [reportError, setReportError] = useState(""),
@@ -26,6 +28,7 @@ export default function Care() {
     setData(await api("state"));
     try {
       setReports(await api("reports"));
+      setGuidedReports(await api("guided-reports"));
       setReportError("");
     } catch (e) {
       setReportError((e as Error).message);
@@ -211,7 +214,8 @@ export default function Care() {
                 belong to this care app.
               </p>
               {reportError && <p className="error">{reportError}</p>}
-              {!reports.length && !reportError && <p>No saved reports yet.</p>}
+              {!reports.length && !guidedReports.length && !reportError && <p>No saved reports yet.</p>}
+              {guidedReports.map(r=>{const ack=data.acknowledgements.find(a=>a.sessionId===r.sessionId);return <div className="row" key={r.sessionId}><span className="pill">{r.evidence.replaceAll("_"," ")} · demo references</span><h3>{r.configuration.label}</h3><p>{r.movementCycles} movements · {r.completedReps} met targets · {r.shortHolds} short holds</p><p>{r.side} leg · {r.completionStatus} · {Math.round(r.timing.activeTimeMs/1000)} seconds active</p><p>{ack?"Acknowledged by "+ack.by:"Awaiting acknowledgement"}</p>{clinician&&!ack&&<button disabled={busy} onClick={()=>act("reports/"+r.sessionId+"/ack",{})}>Acknowledge report</button>}</div>;})}
               {reports.map((r) => {
                 const ack = data.acknowledgements.find(
                   (a) => a.sessionId === r.sessionId,

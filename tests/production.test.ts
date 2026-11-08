@@ -20,6 +20,7 @@ import {
 import { readJson } from "../packages/platform/body";
 import { careService } from "../apps/care/src/server/service";
 import { rehabService } from "../apps/rehab/src/server/service";
+import { cvService } from "../apps/rehab/src/server/cv/service";
 import { PatientMemoryRepository } from "../apps/panda/src/server/patient-memory";
 import { PostgresVoiceRepository } from "../apps/panda/src/server/postgres-repository";
 import { PostgresStore } from "../packages/platform/production/database";
@@ -138,6 +139,17 @@ test("only an assigned clinician imports and approves; patients never receive dr
     () => accountIdentity(doctor, "", b, "token"),
     /not assigned/,
   );
+});
+test("guided exercise uses authenticated patient storage and patient-only writes", async () => {
+  const care=careService(),cv=cvService(undefined,{care:()=>care.snapshot()});
+  const payload={requestId:randomUUID(),exerciseId:"static-quads",side:"left",startedAtUtc:new Date().toISOString(),evidence:"patient_reported"};
+  const session=await as(actorA,()=>cv.start(a,payload));
+  assert.equal(session.careReference?.patientId,a);
+  await assert.rejects(()=>as(actorB,()=>cv.get(a,session.id)),/not found/i);
+  await assert.rejects(()=>as(actorA,()=>cv.start(b,{...payload,requestId:randomUUID()})),/approved patient context/);
+  await assert.rejects(()=>as(clinician,()=>cv.start(a,payload)),/patient/);
+  assert.equal((await as(actorA,()=>cv.get(a,session.id))).id,session.id);
+  assert.equal((await as(actorB,()=>cv.reports(b))).length,0);
 });
 test("patient writes and idempotency are isolated; foreign task and session IDs fail", async () => {
   const care = careService();

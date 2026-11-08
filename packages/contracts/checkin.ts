@@ -12,6 +12,9 @@ export const ContinueCheckinSchema = z.object({
   confirmationText: z.string().min(1).max(2000).optional(),
 }).strict();
 export const RehabBridgeEventSchema = z.discriminatedUnion("type", [
+  z.object({version:z.literal("1.0.0"),type:z.literal("guided_session_started"),sessionId:z.string().uuid()}).strict(),
+  z.object({version:z.literal("1.0.0"),type:z.literal("guided_report_saved"),sessionId:z.string().uuid()}).strict(),
+  z.object({version:z.literal("1.0.0"),type:z.literal("guided_feedback"),sessionId:z.string().uuid(),feedbackId:z.string().uuid()}).strict(),
   z.object({ version: z.literal("1.0.0"), type: z.literal("session_started"), sessionId: z.string().min(1), planId: z.string(), planVersion: z.number().int().positive() }).strict(),
   z.object({ version: z.literal("1.0.0"), type: z.literal("camera_status"), status: z.enum(["preview_on", "preview_off"]) }).strict(),
   z.object({ version: z.literal("1.0.0"), type: z.literal("tracking_status"), sessionId: z.string().min(1), status: z.enum(["calibrating", "reliable", "unreliable", "lost", "unavailable"]) }).strict(),
@@ -30,6 +33,8 @@ export type CheckinSession = {
   id: string; patientId: string; planId: string; planVersion: number;
   stage: CheckinStage; medicationTaskIds: string[]; medicationIndex: number;
   pendingProposalId?: string; exerciseSessionId?: string; startedAt: string; updatedAt: string;
+  exerciseFeature?:"guided";
+  exerciseLabel?:string;
   painReported?: boolean;
   foodKnown?: boolean;
   concernPending?: boolean;

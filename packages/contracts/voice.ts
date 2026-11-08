@@ -42,6 +42,7 @@ export type VoiceReply = {
   speechText?: string;
   confirmationPrompt?: boolean;
   pauseExercise?: boolean;
+  exerciseCue?:{eventId:string;code:string;expiresAt:string|null};
   conversationEnded?: boolean;
   proposalId?: string;
   navigation?: "/rehab";

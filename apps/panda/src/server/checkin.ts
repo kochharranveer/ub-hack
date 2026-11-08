@@ -1,3 +1,5 @@
+import { getGuidedSession,getGuidedFeedback } from "../../../../packages/platform/guided-rehab";
+import { CvSessionSchema,CvFeedbackSchema,type CvSession,type CvFeedbackText } from "../../../../packages/contracts/rehab-cv";
 import { randomUUID } from "node:crypto";
 import { StartCheckinSchema, AnswerCheckinSchema, ContinueCheckinSchema, ExerciseFeedbackSchema,
   type CheckinSession, type PatientMemoryEvent, type MemoryKind } from "../../../../packages/contracts/checkin";
@@ -17,6 +19,8 @@ type Dependencies = {
   snapshot: () => Promise<CareSnapshot>;
   exerciseSession: (id: string) => Promise<Session>;
   mode: "fixture" | "connected";
+  guidedSession?:(id:string)=>Promise<CvSession>;
+  guidedFeedback?:(id:string,eventId:string)=>Promise<CvFeedbackText>;
 };
 export function polarity(text: string): "yes" | "no" | "unknown" {
   const value = text.toLowerCase().trim();
@@ -34,6 +38,7 @@ export function checkinService(
   assistant: Voice = voice,
   bridge: Dependencies = {
     snapshot: getCare,
+    guidedSession:getGuidedSession,guidedFeedback:getGuidedFeedback,
     exerciseSession: async id => SessionSchema.parse(await callPeer("rehab","sessions/"+encodeURIComponent(id))),
     mode: connected() ? "connected" : "fixture",
   },
@@ -68,8 +73,8 @@ export function checkinService(
     if(s.stage==="food")return reply(s,s.foodKnown?"Have you had anything else to eat since your last check-in?":"What have you had to eat today?");
     if(s.stage==="followup")return reply(s,"When would you like your next care-team check-in? I can note a preference, but booking is still pending.");
     if(s.stage==="readiness")return reply(s,"How are you feeling about doing a little exercise?");
-    if(s.stage==="exercise")return reply(s,"Let's open your exercise. I'll stay here with you.",{navigation:"/rehab"});
-    if(s.stage==="exercise_review")return reply(s,"How did your arm feel during that?");
+    if(s.stage==="exercise")return reply(s,"Let's open the guided exercise demo. I'll stay here with you.",{navigation:"/rehab"});
+    if(s.stage==="exercise_review")return reply(s,"How did that exercise feel?");
     if(s.stage==="pain_check")return reply(s,"Did you notice any pain or discomfort?");
     return reply(s,"We've covered the check-in. What's on your mind?");
   }
@@ -111,7 +116,8 @@ export function checkinService(
       signal?.throwIfAborted();
       const result=await fn(tx,care);
       signal?.throwIfAborted();
-      const silent=(payload as {op?:string;event?:{type:string}}).op==="exercise-feedback"&&((payload as {event:{type:string}}).event.type!=="report_saved"||["help_confirmation","wellbeing_followup"].includes(result.checkin?.stage||""));
+      const callback=payload as {op?:string;event?:{type:string}};
+      const silent=callback.op==="exercise-feedback"&&(!["report_saved","guided_report_saved"].includes(callback.event?.type||"")||["help_confirmation","wellbeing_followup"].includes(result.checkin?.stage||""));
       if(result.checkin&&!silent){const session=tx.session(result.checkin.id);if(session){
         const input=payload as {text?:string};if(input.text)utterance(tx,session,raw.requestId,input.text,"user");
         utterance(tx,session,raw.requestId,result.speechText||result.message,"assistant");
@@ -132,6 +138,12 @@ export function checkinService(
     const report=ReportSchema.parse(captured.report);
     if(report.planId!==s.planId||report.planVersion!==s.planVersion)throw new DomainError("CONFLICT","Report plan does not match the captured check-in.");
     event(tx,s,"report:"+captured.id,"exercise_report","Rehab report summary: "+report.repetitions+" repetitions; range "+(report.rangeDegrees===null?"unavailable":report.rangeDegrees+" degrees")+"; evidence: "+report.evidence+"; tracking: "+report.trackingQuality+"; ended: "+report.terminationReason+".","rehab_report",{sessionId:captured.id,sourceRoute:"/rehab/api/sessions/"+captured.id,evidence:report.evidence,trackingQuality:report.trackingQuality});
+    return report;
+  }
+  function rememberGuided(tx:MemoryTransaction,s:CheckinSession,captured:CvSession){
+    const report=captured.report;if(!report)throw new DomainError("CONFLICT","Rehab has not saved this guided report yet.");
+    const ref=captured.careReference;if(!ref||ref.patientId!==s.patientId||ref.planId!==s.planId||ref.planVersion!==s.planVersion)throw new DomainError("CONFLICT","Guided report does not match the captured care context.");
+    event(tx,s,"guided-report:"+captured.id,"exercise_report",report.configuration.label+": "+report.movementCycles+" movements, "+report.completedReps+" met demonstration targets; "+report.shortHolds+" short holds; evidence "+report.evidence+"; tracking "+report.trackingQuality+"; ended "+report.terminationReason+".","rehab_report",{sessionId:captured.id,sourceRoute:"/rehab/api/cv/v1/sessions/"+captured.id,evidence:report.evidence,configurationMode:report.configurationMode,report});
     return report;
   }
   return {
@@ -282,10 +294,35 @@ export function checkinService(
     async exerciseFeedback(raw: unknown,signal?:AbortSignal) {
       const v=ExerciseFeedbackSchema.parse(raw);
       const care=await bridge.snapshot();
-      const captured=("sessionId" in v.event) ? SessionSchema.parse(await bridge.exerciseSession(v.event.sessionId)) : undefined;
+      const isGuided=v.event.type.startsWith("guided_");
+      const guided=isGuided&&"sessionId" in v.event?CvSessionSchema.parse(await (bridge.guidedSession||getGuidedSession)(v.event.sessionId)):undefined;
+      const cue=v.event.type==="guided_feedback"?CvFeedbackSchema.parse(await (bridge.guidedFeedback||getGuidedFeedback)(v.event.sessionId,v.event.feedbackId)):undefined;
+      const captured=(!isGuided&&"sessionId" in v.event) ? SessionSchema.parse(await bridge.exerciseSession(v.event.sessionId)) : undefined;
       if (captured && captured.patientId!==care.patientId) throw new DomainError("FORBIDDEN","Exercise session belongs to a different patient.",403);
       return once(v,{op:"exercise-feedback",...v},signal,async(tx,current) => {
         const s=requireSession(tx,v.checkinId,current);
+        if(guided){
+          const ref=guided.careReference;
+          if(!ref||ref.patientId!==current.patientId||ref.planId!==s.planId||ref.planVersion!==s.planVersion)throw new DomainError("FORBIDDEN","Guided session does not belong to this patient and care context.",403);
+          if(s.exerciseSessionId&&s.exerciseSessionId!==guided.id)throw new DomainError("CONFLICT","Guided feedback belongs to a different exercise session.");
+          if(s.stage!=="exercise"){
+            if(v.event.type==="guided_report_saved"&&["exercise_review","pain_check","help_confirmation","wellbeing_followup","complete"].includes(s.stage)){rememberGuided(tx,s,guided);return question(s,current);}
+            throw new DomainError("CONFLICT","No guided exercise is active in this check-in.");
+          }
+          s.exerciseSessionId=guided.id;s.exerciseFeature="guided";s.exerciseLabel=guided.configuration.label;save(tx,s);
+          if(v.event.type==="guided_report_saved"){
+            const report=rememberGuided(tx,s,guided);if(report.terminationReason==="discomfort_reported")s.concernPending=true;s.stage="exercise_review";save(tx,s);
+            return say(tx,s,current,v.requestId,question(s,current),"The owner saved the "+guided.configuration.label+" report. "+(report.terminationReason==="discomfort_reported"?"They chose to stop for discomfort. Keep exercise on hold and ask what they felt. ":"")+"Its evidence is "+report.evidence+" and the targets are synthetic demonstration references, not a prescription or clinical validation. Acknowledge the actual evidence briefly, then ask how the exercise felt. Never call patient-reported holds camera verified.",undefined,signal);
+          }
+          if(cue){
+            if(cue.sessionId!==guided.id||cue.sessionControlRevision!==guided.sessionControlRevision||guided.status!=="running"||cue.expiresAtUtc&&Date.parse(cue.expiresAtUtc)<=now())return question(s,current);
+            const seen=tx.events("exercise_feedback",200).some(e=>e.metadata.feedbackId===cue.eventId);
+            if(seen)return question(s,current);
+            event(tx,s,"guided-cue:"+cue.eventId,"exercise_feedback",cue.text,"rehab_report",{sessionId:guided.id,feedbackId:cue.eventId,code:cue.feedbackCode,evidence:cue.evidence,sourceRoute:"/rehab/api/cv/v1/sessions/"+guided.id+"/feedback/"+cue.eventId});
+            return reply(s,cue.text,{exerciseCue:{eventId:cue.eventId,code:cue.feedbackCode,expiresAt:cue.expiresAtUtc}});
+          }
+          return question(s,current);
+        }
         if (s.stage!=="exercise") {
           if (v.event.type==="camera_status") return question(s,current);
           if (v.event.type==="report_saved" && captured && captured.id===s.exerciseSessionId && ["exercise_review","pain_check","help_confirmation","wellbeing_followup","complete"].includes(s.stage)) {rememberReport(tx,s,captured);return question(s,current);}
@@ -304,7 +341,7 @@ export function checkinService(
           s.stage="exercise_review"; save(tx,s);
           const review=question(s,current);
           return say(tx,s,current,v.requestId,{...review,message:(report.evidence==="simulated"?"That was a simulated demo session. ":"Your report is saved. ")+review.message},"The exercise report is saved. "+(report.evidence==="simulated"?"You MUST explicitly say this was simulated/a demo, not measured exercise. ":"")+"Ask how the patient felt, one question. Don't read statistics or technical report fields aloud.",undefined,signal);
-        } else {
+        } else if(v.event.type==="camera_status"||v.event.type==="tracking_status") {
           if (v.event.type==="tracking_status" && (!captured || s.exerciseSessionId!==captured.id))
             throw new DomainError("CONFLICT","Tracking feedback does not match the active session.");
           event(tx,s,v.requestId,"exercise_feedback",v.event.type==="camera_status"

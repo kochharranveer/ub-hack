@@ -1,2 +1,1 @@
-"use client";
-export { default } from "../../../../packages/rehab-bridge/Workspace";
+export { default } from "../../../../packages/rehab-bridge/GuidedWorkspace";

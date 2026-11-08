@@ -100,7 +100,8 @@ export function authorizeOperation(
 ) {
   const clinicianWrite =
     /^\/care\/api\/(?:plans\/|(?:help|reports)\/[^/]+\/ack$)/.test(path);
-  const patientOnly =
+  const cvMutation=method!=="GET"&&/^\/rehab\/api\/cv\//.test(path);
+  const patientOnly = cvMutation ||
     /^\/api\/(?:voice\/|context$)/.test(path) ||
     (method !== "GET" &&
       /^\/(?:care\/api\/(?:help$|tasks\/)|rehab\/api\/sessions)/.test(path));
