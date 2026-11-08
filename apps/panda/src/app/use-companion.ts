@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { requestsExercise } from "../../../../packages/contracts/exercise-navigation";
 import { recordedRecognition, speechInputMode } from "./recorded-recognition";
 import { spokenConfirmation } from "./voice-confirmation";
 import { ConversationMicrophone } from "./conversation-microphone";
@@ -311,8 +312,14 @@ export function useCompanion() {
     setPhase("thinking");
     setError("");
     setNotice("");
-    const activeCheckin = !direct ? checkinRef.current : undefined;
-    const route = activeCheckin ? "voice/checkin/answer" : "voice/turn";
+    const openingExercise = requestsExercise(value);
+    const activeCheckin =
+      !direct && !openingExercise ? checkinRef.current : undefined;
+    const route = openingExercise
+      ? "voice/checkin/open-exercise"
+      : activeCheckin
+        ? "voice/checkin/answer"
+        : "voice/turn";
     if (pending.current?.text !== value || pending.current.route !== route)
       pending.current = {
         requestId: crypto.randomUUID(),
@@ -714,6 +721,38 @@ export function useCompanion() {
     }
   }
 
+  async function openExercise() {
+    stopMic();
+    stopSound();
+    for (const controller of requests.current) controller.abort();
+    requests.current.clear();
+    const run = ++generation.current;
+    inFlight.current = true;
+    pending.current = null;
+    setError("");
+    setNotice("");
+    setPhase("thinking");
+    try {
+      const result = await request<VoiceReply>("voice/checkin/open-exercise", {
+        requestId: crypto.randomUUID(),
+      });
+      if (!live.current || run !== generation.current) return;
+      inFlight.current = false;
+      acceptReply(result);
+      if (handsfree.current) void speak();
+    } catch (error) {
+      if (live.current && run === generation.current) {
+        setError((error as Error).message);
+        setPhase(settledPhase());
+      }
+    } finally {
+      if (run === generation.current) {
+        inFlight.current = false;
+        if (feedbackQueue.current.length) void flushFeedback();
+      }
+    }
+  }
+
   async function beginCheckin(withVoice = false) {
     if (inFlight.current) return;
     stopMic();
@@ -1026,6 +1065,7 @@ export function useCompanion() {
     activateVoice,
     changeMicConsent,
     changeSpeechConsent,
+    openExercise,
     beginCheckin,
     exerciseFeedback,
     retryFeedback: flushFeedback,

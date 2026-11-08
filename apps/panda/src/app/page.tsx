@@ -226,14 +226,7 @@ export default function Panda() {
     if (!c.text) setDirectDraft(false);
   }, [c.text]);
   useEffect(() => {
-    if (c.reply?.pauseExercise) {
-      return;
-    }
-    if (
-      c.reply?.checkin?.stage === "exercise" &&
-      c.reply.navigation === "/rehab"
-    )
-      setExerciseOpen(true);
+    if (c.reply?.navigation === "/rehab") setExerciseOpen(true);
     if (
       c.reply?.checkin &&
       ["exercise_review", "pain_check"].includes(c.reply.checkin.stage)
@@ -244,6 +237,10 @@ export default function Panda() {
     setMode("voice");
     if (exerciseOpen && c.checkin && c.checkin.stage !== "complete") c.listen();
     else void c.activateVoice();
+  }
+  function openExercise() {
+    setExerciseOpen(true);
+    void c.openExercise();
   }
   function keyboard() {
     c.stop();
@@ -482,24 +479,23 @@ export default function Panda() {
               </button>
             </li>
             <li>
-              <span className={styles.actionIcon}>
-                <MotionIcon />
-              </span>
-              <div>
-                <strong>Move a little</strong>
-                <small>
-                  {c.context?.runtime === "production"
-                    ? "Guided exercise demonstration"
-                    : "Guided exercise"}
-                </small>
-              </div>
               <button
                 type="button"
-                disabled={c.busy || !plan}
-                onClick={talk}
-                aria-label="Start exercise check-in"
+                className={styles.exerciseAction}
+                disabled={!plan}
+                onClick={openExercise}
+                aria-label="Open guided exercise"
               >
-                ↗
+                <span className={styles.actionIcon}>
+                  <MotionIcon />
+                </span>
+                <span className={styles.exerciseActionCopy}>
+                  <strong>Move a little</strong>
+                  <small>Guided exercise</small>
+                </span>
+                <span aria-hidden="true" className={styles.exerciseArrow}>
+                  ↗
+                </span>
               </button>
             </li>
             <li>
@@ -627,7 +623,7 @@ export default function Panda() {
         >
           <RehabWorkspace
             presentation="camera"
-            canStart={c.checkin?.stage === "exercise"}
+            canStart={c.checkin?.stage === "exercise" && !c.busy}
             onEvent={c.exerciseFeedback}
             onAskPanda={talk}
             pauseRequested={Boolean(c.reply?.pauseExercise)}

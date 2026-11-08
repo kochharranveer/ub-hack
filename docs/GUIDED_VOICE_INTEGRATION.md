@@ -31,7 +31,7 @@ The local migration `supabase/migrations/20261108060015_guided_rehab_storage.sql
 
 ## Verification on this revision
 
-- `npm run check`: 164 tests, including imported evaluator tests and new streaming, interruption, owner-report integration and authenticated patient-isolation regressions.
+- `npm run check`: 168 tests, including imported evaluator tests and new streaming, interruption, owner-report integration and authenticated patient-isolation regressions.
 - `npm run build`: all three apps.
 - `npm run test:integration`: 32 connected checks plus three standalone app checks. Includes real HTTP calls through the gateway for the guided owner API, verified feedback, Panda review, Care report retrieval and acknowledgement.
 - `npm run test:browser`: isolated Chrome with fake media devices and synthetic PCM. Checks the full agenda, full-height camera, corner Panda, microphone/typing switches, local pose initialization with fake video, embedded patient-confirmed hold, saved result, post-exercise review, no-scroll responsive home, inline typing, voice playback, circular visualizer and tap interruption.
@@ -48,3 +48,9 @@ The same engine and canonical owner APIs drive both presentations. Exit attempts
 Finalized Gemini feedback retains text source/revision in patient memory and is included among the model's remembered topics. Immediate display can use the fallback while generation is pending; voice waits for the final revision, avoiding duplicate fallback/generated speech. Regression checks cover this handoff and reuse of the existing server-only Panda key.
 
 The live Gemini feedback check on this revision returned `rate_limited`. The connection is configured, but current live Gemini-generated conversation/wording is limited by the provider account. Built-in exercise cues remain available; no live Gemini success is claimed for this check.
+
+## Opening rehab
+
+The whole “Move a little” action opens the embedded camera view directly. `POST /api/voice/checkin/open-exercise` creates or resumes the patient-scoped exercise context without an AI provider call. Explicit requests such as “open rehab”, “start the exercise module” and “let’s exercise” use that same path from Panda’s speech transcript or typing; direct `/checkin/answer` clients also recognize the request before model generation. Questions, negative answers and symptom concerns are not navigation commands.
+
+Opening the view never completes medicine, meal or follow-up checks. If exercise is requested first, the prior agenda position is retained and resumed after the owner report, feelings review and pain check. Existing pending confirmations remain unresolved and prevent a set from starting; care concerns continue to hold exercise. Resuming an already-open exercise view does not require Gemini. Browser checks click the row with general conversation start deliberately unavailable, and verify a typed request opens the same view.

@@ -1,7 +1,8 @@
 import { getGuidedSession,getGuidedFeedback } from "../../../../packages/platform/guided-rehab";
 import { CvSessionSchema,CvFeedbackSchema,type CvSession,type CvFeedbackText } from "../../../../packages/contracts/rehab-cv";
+import { requestsExercise } from "../../../../packages/contracts/exercise-navigation";
 import { randomUUID } from "node:crypto";
-import { StartCheckinSchema, AnswerCheckinSchema, ContinueCheckinSchema, ExerciseFeedbackSchema,
+import { StartCheckinSchema, OpenExerciseSchema, AnswerCheckinSchema, ContinueCheckinSchema, ExerciseFeedbackSchema,
   type CheckinSession, type PatientMemoryEvent, type MemoryKind } from "../../../../packages/contracts/checkin";
 import type { CareSnapshot } from "../../../../packages/contracts/care";
 import type { VoiceReply } from "../../../../packages/contracts/voice";
@@ -57,7 +58,7 @@ export function checkinService(
       ...(s.exerciseSessionId ? {exerciseSessionId:s.exerciseSessionId} : {}),...extra};
   }
   function remaining(s:CheckinSession) {
-    return s.medicationIndex<s.medicationTaskIds.length ? "medications" : !s.foodReviewed ? "food" : !s.followupReviewed ? "followup" : s.concernPending?"complete":"readiness";
+    return s.medicationIndex<s.medicationTaskIds.length ? "medications" : !s.foodReviewed ? "food" : !s.followupReviewed ? "followup" : (s.concernPending||s.exerciseReviewed)?"complete":"readiness";
   }
   function question(s: CheckinSession,care: CareSnapshot): VoiceReply {
     const task=care.tasks.find(task=>task.id===s.medicationTaskIds[s.medicationIndex]);
@@ -146,10 +147,7 @@ export function checkinService(
     event(tx,s,"guided-report:"+captured.id,"exercise_report",report.configuration.label+": "+report.movementCycles+" movements, "+report.completedReps+" met demonstration targets; "+report.shortHolds+" short holds; evidence "+report.evidence+"; tracking "+report.trackingQuality+"; ended "+report.terminationReason+".","rehab_report",{sessionId:captured.id,sourceRoute:"/rehab/api/cv/v1/sessions/"+captured.id,evidence:report.evidence,configurationMode:report.configurationMode,report});
     return report;
   }
-  return {
-    async start(raw: unknown,signal?:AbortSignal) {
-      const v=StartCheckinSchema.parse(raw);
-      return once(v,{op:"start",...v},signal,async(tx,care) => {
+  function currentSession(tx:MemoryTransaction,care:CareSnapshot,requestId:string){
         let s=tx.latestSession();
         const changed=s && (s.planId !== care.plan!.id || s.planVersion !== care.plan!.version);
         const tooOld=s && now()-Date.parse(s.updatedAt)>24*60*60*1000;
@@ -160,8 +158,31 @@ export function checkinService(
           s={id:randomUUID(),patientId:care.patientId,planId:care.plan!.id,planVersion:care.plan!.version,
             stage:"greeting",agendaVersion:2,foodReviewed:false,followupReviewed:false,foodKnown:tx.events("food").some(e=>time().slice(0,10)===e.at.slice(0,10)),concernPending:care.help.some(h=>h.status==="open"&&worseningConcern(h.quote)),medicationDetailsRequired:required,medicationTaskIds:meds.map(t=>t.id),medicationIndex:0,startedAt:time(),updatedAt:time()};
           save(tx,s);
-          for(const task of meds)event(tx,s,v.requestId+":"+task.id,"medication_context",task.title,"system",{name:medicationLanguage(task,meds).key,title:task.title});
+          for(const task of meds)event(tx,s,requestId+":"+task.id,"medication_context",task.title,"system",{name:medicationLanguage(task,meds).key,title:task.title});
         }
+    return s;
+  }
+  function enterExercise(tx:MemoryTransaction,s:CheckinSession,care:CareSnapshot,requestId:string,text?:string):VoiceReply {
+    if(s.pendingProposalId)return {...question(s,care),navigation:"/rehab",message:"Before starting a set, let's resolve the action we were confirming."};
+    if(s.concernPending)return reply(s,"Let's keep exercise on hold while we talk through your concern.",{pauseExercise:true});
+    if(["exercise_review","pain_check"].includes(s.stage))return {...question(s,care),navigation:"/rehab"};
+    if(s.stage!=="exercise"){
+      if(["greeting","wellbeing_followup","medications","food","followup"].includes(s.stage))s.exerciseResumeStage=["greeting","wellbeing_followup"].includes(s.stage)?remaining(s):s.stage;
+      s.stage="exercise";s.exerciseReviewed=false;
+      event(tx,s,requestId,"checkin_review",text||"Opened guided exercise from the home action.",text?"patient_report":"client_observation",{topic:"exercise_navigation",unfinishedCheckinsPreserved:true});save(tx,s);
+    }
+    return question(s,care);
+  }
+  return {
+    async openExercise(raw:unknown,signal?:AbortSignal){
+      const v=OpenExerciseSchema.parse(raw);
+      if(v.text&&!requestsExercise(v.text))throw new DomainError("VALIDATION_ERROR","Use an explicit request to open exercise.",400);
+      return once(v,{op:"open-exercise",...v},signal,(tx,care)=>enterExercise(tx,currentSession(tx,care,v.requestId),care,v.requestId,v.text));
+    },
+    async start(raw: unknown,signal?:AbortSignal) {
+      const v=StartCheckinSchema.parse(raw);
+      return once(v,{op:"start",...v},signal,async(tx,care) => {
+        const s=currentSession(tx,care,v.requestId);
         if (["medication_confirmation","help_confirmation"].includes(s.stage) && s.pendingProposalId) {
           const pending=await assistant.proposalStatus(s.pendingProposalId,care.patientId);
           if (!pending || (pending.confirmedAt===undefined && !pending.result && pending.expiresAt<=now())) {
@@ -174,6 +195,7 @@ export function checkinService(
           if(pending?.command.name==="confirm_task"){const taskId=pending.command.args.taskId;base={...base,message:"Record your completion of “"+care.tasks.find(t=>t.id===taskId)?.title+"”? This is patient-reported."};}
           else if(pending?.command.name==="request_help")base={...base,message:"Record this for care-team review? “"+pending.command.args.quote+"”"};
         }
+        if(s.stage==="exercise")return base;
         return say(tx,s,care,v.requestId,base,s.stage==="greeting"?"Greet warmly as Panda, ask how the documented elbow/body part feels. If a prior concern is pending acknowledge it gently. No checklist, medicines, meals or booking at hello.":"Resume the actual unfinished topic naturally. Do not restart completed items or recite the plan. Pending action details remain in the visible proposal.",undefined,signal);
       });
     },
@@ -187,6 +209,7 @@ export function checkinService(
       }
       return once(v,{op:"answer",...v},signal,async(tx,care)=>{
         const s=requireSession(tx,v.checkinId,care);
+        if(requestsExercise(v.text))return enterExercise(tx,s,care,v.requestId,v.text);
         if(v.expectedStage&&s.stage!==v.expectedStage)throw new DomainError("CONFLICT","The conversation moved to another step. Resume it before answering.");
         if(s.agendaVersion!==2&&!s.pendingProposalId){s.agendaVersion=2;s.medicationTaskIds=medicationTasks(care).map(t=>t.id);s.medicationIndex=0;s.foodReviewed=false;s.followupReviewed=false;}
         const next={...s,medicationIndex:s.medicationIndex+1};
@@ -217,6 +240,7 @@ export function checkinService(
         if(s.stage==="pain_check")moves.push({id:"pain_none",goal:"They report no pain/discomfort. Acknowledge briefly and leave the conversation open for their questions. No redundant medical/scheduling boilerplate.",fallback:"Good to know. Is there anything else you'd like to talk through?"},{id:"pain_report",goal:"They described pain/discomfort. Acknowledge, suggest stopping exercise, and offer to record their exact words for care-team review. Do not diagnose or claim someone has been notified.",fallback:"Let's leave exercise there. Would you like me to record that discomfort for your care team to review?"},{id:"pain_more",goal:"They said there was pain but haven't described it. Ask one natural follow-up, not a yes/no form prompt.",fallback:"Can you tell me what the discomfort felt like?"});
         const wantsEnd=/\b(?:bye|goodbye|good night|end (?:the |this )?call|stop (?:the |this )?(?:call|conversation)|hang up)\b/i.test(v.text);
         const resume=!patientQuestion(v.text)&&(/\b(?:let.s (?:go on|move on|continue)|go on|move on)\b/i.test(v.text)||["greeting","wellbeing_followup"].includes(s.stage)&&/\b(?:no (?:more |other )?questions|nothing else|(?:don.t|do not) (?:think I )?(?:have|need) anything else|thank you|thanks)\b/i.test(v.text));
+        if(s.exerciseReviewed&&s.stage==="followup")for(const move of moves)if(["followup_preference","followup_declined"].includes(move.id)){move.goal="Acknowledge their preference without claiming a booking. Exercise was already reviewed. Briefly wrap up the completed check-in and invite remaining questions.";move.fallback="I've noted that. Booking is still pending. We've covered today's check-in—anything else on your mind?";}
         const allowed=worseningConcern(v.text)?moves.filter(m=>m.id==="care_concern") : wantsEnd&&moves.some(m=>m.id==="end_call")?moves.filter(m=>m.id==="end_call") : resume&&!["followup","complete","exercise"].includes(s.stage)&&!s.pendingProposalId?moves.filter(m=>m.id==="continue_checkin"):moves;
         const d=await model({care,session:s,history:tx.dialogue(),memory:reports(tx),text:v.text,moves:allowed},signal);
         if(!allowed.some(m=>m.id===d.move)||d.foodQuote&&!v.text.includes(d.foodQuote))throw new DomainError("VALIDATION_ERROR","Unsupported conversation decision or patient quote.",400);
@@ -246,7 +270,7 @@ export function checkinService(
           event(tx,s,v.requestId,"scheduling_pending","Doctor availability is not connected; no follow-up was booked.","system",{booked:false});
           s.foodReviewed=true;s.stage="followup";base=question(s,care);
         }else if(d.move==="followup_preference"||d.move==="followup_declined"){
-          event(tx,s,v.requestId,"scheduling_pending",v.text,"patient_report",{requested:d.move==="followup_preference",booked:false});s.followupReviewed=true;s.stage=s.concernPending?"complete":"readiness";base=question(s,care);
+          event(tx,s,v.requestId,"scheduling_pending",v.text,"patient_report",{requested:d.move==="followup_preference",booked:false});s.followupReviewed=true;s.stage=(s.concernPending||s.exerciseReviewed)?"complete":"readiness";base=question(s,care);
         }else if(d.move==="end_call"){
           s.endedAt=time();base=reply(s,d.response,{conversationEnded:true});
         }else if(d.move==="ready_yes"||d.move==="ready_no"){
@@ -258,7 +282,9 @@ export function checkinService(
         }else if(d.move==="pain_more"){
           event(tx,s,v.requestId,"pain_review",v.text,"patient_report",{sessionId:s.exerciseSessionId,reportedPain:true});s.painReported=true;
         }else if(d.move==="pain_none"){
-          event(tx,s,v.requestId,"pain_review",v.text,"patient_report",{sessionId:s.exerciseSessionId,possibleDiscomfort:false});s.stage="complete";
+          event(tx,s,v.requestId,"pain_review",v.text,"patient_report",{sessionId:s.exerciseSessionId,possibleDiscomfort:false});s.exerciseReviewed=true;
+          if(s.exerciseResumeStage){s.stage=s.exerciseResumeStage;s.exerciseResumeStage=undefined;save(tx,s);return {...question(s,care),message:"Thanks for letting me know. "+question(s,care).message};}
+          s.stage="complete";
         }
         save(tx,s);
         if(s.pendingProposalId){

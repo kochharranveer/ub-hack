@@ -91,6 +91,62 @@ try {
     844,
   );
   await page.screenshot({ path: path.join(output, "panda-home.png") });
+  // The entire home action opens Rehab even when general conversation start is unavailable.
+  let generalStarts = 0;
+  await page.route("**/api/voice/checkin/start", async (route) => {
+    generalStarts++;
+    await route.fulfill({
+      status: 503,
+      json: { ok: false, error: { message: "Test provider unavailable" } },
+    });
+  });
+  const openedResponse = page.waitForResponse((r) =>
+    r.url().endsWith("/api/voice/checkin/open-exercise"),
+  );
+  await page.getByText("Move a little", { exact: true }).click();
+  const opened = (await (await openedResponse).json()).data;
+  assert.equal(opened.checkin.stage, "exercise");
+  assert.equal(generalStarts, 0);
+  await page
+    .getByRole("region", { name: "Exercise with Panda", exact: true })
+    .waitFor();
+  await page.screenshot({ path: path.join(output, "direct-rehab-entry.png") });
+  await page
+    .getByRole("button", { name: "Exit exercise", exact: true })
+    .click();
+  await page.unroute("**/api/voice/checkin/start");
+  async function resetMemory() {
+    const r = await page.request.delete(origin + "/api/voice/memory", {
+      data: { confirm: true },
+      headers: { Origin: origin },
+    });
+    assert.ok(r.ok());
+    await page.reload();
+    await page
+      .getByText("Ready for a good day, Alex?", { exact: true })
+      .waitFor();
+  }
+  await resetMemory();
+  await page.getByRole("button", { name: "Use keyboard", exact: true }).click();
+  await page
+    .getByRole("status")
+    .filter({ hasText: /how.*elbow/i })
+    .waitFor();
+  await page
+    .getByRole("textbox", { name: "Your message" })
+    .fill("Panda, open the rehab section");
+  const askedResponse = page.waitForResponse((r) =>
+    r.url().endsWith("/api/voice/checkin/open-exercise"),
+  );
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  assert.equal((await (await askedResponse).json()).data.navigation, "/rehab");
+  await page
+    .getByRole("region", { name: "Exercise with Panda", exact: true })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Exit exercise", exact: true })
+    .click();
+  await resetMemory();
   await page.getByRole("button", { name: "Use keyboard", exact: true }).click();
   assert.equal(
     await page

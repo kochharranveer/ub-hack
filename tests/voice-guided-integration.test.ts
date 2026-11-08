@@ -1,3 +1,4 @@
+import { requestsExercise } from "../packages/contracts/exercise-navigation";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -14,7 +15,7 @@ import {
   CvFeedbackSchema,
 } from "../packages/contracts/rehab-cv";
 import type { VoiceReply } from "../packages/contracts/voice";
-async function setup(t: test.TestContext) {
+async function setup(t: test.TestContext, advance = true) {
   const dir = await mkdtemp(path.join(tmpdir(), "panda-guided-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const care = careService(path.join(dir, "care.json")),
@@ -57,20 +58,22 @@ async function setup(t: test.TestContext) {
     });
     return r;
   }
-  for (const text of [
-    "My elbow feels okay",
-    "No not yet",
-    "Soup",
-    "Tomorrow",
-    "Yes",
-  ])
-    await answer(text);
-  assert.equal(r.checkin?.stage, "exercise");
+  if (advance)
+    for (const text of [
+      "My elbow feels okay",
+      "No not yet",
+      "Soup",
+      "Tomorrow",
+      "Yes",
+    ])
+      await answer(text);
+  if (advance) assert.equal(r.checkin?.stage, "exercise");
   return {
     owner,
     cv,
     chat,
     memory,
+    voice,
     care,
     answer,
     reply: () => r,
@@ -305,4 +308,146 @@ test("Panda waits for finalized Gemini wording and keeps the source in patient c
   } finally {
     globalThis.fetch = fetcher;
   }
+});
+
+test("explicit exercise requests are navigation, while questions and refusals stay in conversation", () => {
+  for (const text of [
+    "Open rehab",
+    "Can you open the exercise module?",
+    "Panda, let's exercise",
+    "I want to exercise",
+    "Let's do some exercise",
+    "Take me to rehabilitation",
+  ])
+    assert.equal(requestsExercise(text), true, text);
+  for (const text of [
+    "I don't want to exercise",
+    "I can't start exercise",
+    "How do I start exercise?",
+    "Panda, how do I start exercise?",
+    "Show me my exercise report",
+    "Can I start exercise after surgery?",
+    "Will exercise hurt my elbow?",
+    "Not ready to exercise",
+    "Start exercise but my elbow hurts",
+  ])
+    assert.equal(requestsExercise(text), false, text);
+});
+test("direct exercise opening and spoken navigation do not depend on model generation", async (t) => {
+  const x = await setup(t, false);
+  let modelCalls = 0;
+  const chat = checkinService(
+    x.memory,
+    x.voice,
+    {
+      mode: "connected",
+      snapshot: () => x.care.snapshot(),
+      exerciseSession: async () => {
+        throw Error("unused");
+      },
+    },
+    Date.now,
+    async () => {
+      modelCalls++;
+      throw Error("Provider unavailable");
+    },
+  );
+  const input = { requestId: randomUUID() };
+  const opened = await chat.openExercise(input);
+  assert.equal(opened.navigation, "/rehab");
+  assert.equal(opened.checkin?.stage, "exercise");
+  assert.deepEqual(await chat.openExercise(input), opened);
+  const spoken = await chat.answer({
+    requestId: randomUUID(),
+    checkinId: opened.checkin!.id,
+    text: "Open the rehab section",
+  });
+  assert.equal(spoken.navigation, "/rehab");
+  assert.equal(
+    (await chat.start({ requestId: randomUUID() })).checkin?.stage,
+    "exercise",
+  );
+  assert.equal(modelCalls, 0);
+  const remembered = await chat.memory();
+  assert.equal(remembered.checkin?.medicationIndex, 0);
+  assert.equal(remembered.checkin?.foodReviewed, false);
+  assert.equal(remembered.checkin?.followupReviewed, false);
+  assert.ok(
+    (await x.care.snapshot()).tasks.every((task) => task.status === "pending"),
+  );
+});
+test("exercise opened first returns to unfinished check-ins after the owner report and pain review", async (t) => {
+  const x = await setup(t, false);
+  const opened = await x.chat.openExercise({ requestId: randomUUID() });
+  const session = await x.cv.start(x.owner, {
+    requestId: randomUUID(),
+    exerciseId: "static-quads",
+    side: "left",
+    startedAtUtc: new Date().toISOString(),
+    evidence: "patient_reported",
+  });
+  await x.feedback({
+    version: "1.0.0",
+    type: "guided_session_started",
+    sessionId: session.id,
+  });
+  await x.cv.finish(x.owner, session.id, {
+    requestId: randomUUID(),
+    lastMeasurementSequence: 0,
+    report: {
+      observedEndedAtUtc: new Date().toISOString(),
+      completionStatus: "incomplete",
+      terminationReason: "finished",
+      timing: {
+        elapsedTimeMs: 0,
+        activeTimeMs: 0,
+        pausedTimeMs: 0,
+        userPausedTimeMs: 0,
+        trackingPausedTimeMs: 0,
+        otherPausedTimeMs: 0,
+        guidedTimerMs: 0,
+      },
+    },
+  });
+  await x.feedback({
+    version: "1.0.0",
+    type: "guided_report_saved",
+    sessionId: session.id,
+  });
+  let reply = await x.chat.answer({
+    requestId: randomUUID(),
+    checkinId: opened.checkin!.id,
+    expectedStage: "exercise_review",
+    text: "It felt okay",
+  });
+  assert.equal(reply.checkin?.stage, "pain_check");
+  reply = await x.chat.answer({
+    requestId: randomUUID(),
+    checkinId: opened.checkin!.id,
+    expectedStage: "pain_check",
+    text: "No pain or discomfort",
+  });
+  assert.equal(reply.checkin?.stage, "medications");
+  assert.match(reply.message, /atorvastatin/i);
+});
+test("opening rehab preserves a pending confirmation and holds exercise for an existing concern", async (t) => {
+  const x = await setup(t, false);
+  await x.answer("My elbow feels okay");
+  const proposal = await x.answer("Yes");
+  assert.ok(proposal.proposalId);
+  let opened = await x.chat.openExercise({ requestId: randomUUID() });
+  assert.equal(opened.navigation, "/rehab");
+  assert.equal(opened.proposalId, proposal.proposalId);
+  assert.equal(opened.checkin?.stage, "medication_confirmation");
+  await x.memory.transaction(x.owner, (tx) => {
+    const s = tx.latestSession()!;
+    s.pendingProposalId = undefined;
+    s.concernPending = true;
+    s.stage = "wellbeing_followup";
+    tx.saveSession(s);
+  });
+  opened = await x.chat.openExercise({ requestId: randomUUID() });
+  assert.equal(opened.navigation, undefined);
+  assert.equal(opened.pauseExercise, true);
+  assert.notEqual(opened.checkin?.stage, "exercise");
 });
