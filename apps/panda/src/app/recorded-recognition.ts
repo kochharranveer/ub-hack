@@ -9,13 +9,13 @@ export function speechInputMode(nativeAvailable:boolean,recordingAvailable:boole
   return transcriptionConfigured&&recordingAvailable ? "recorded" : nativeAvailable ? "native" : undefined;
 }
 /** Bounded microphone turn; configured server transcription is preferred to browser recognition. */
-export function recordedRecognition(transcribe:(audio:Blob,signal:AbortSignal)=>Promise<string>,processing:()=>void,sharedContext?:()=>AudioContext):SpeechInput {
+export function recordedRecognition(transcribe:(audio:Blob,signal:AbortSignal)=>Promise<string>,processing:()=>void,sharedContext?:()=>AudioContext,sharedStream?:()=>Promise<MediaStream>):SpeechInput {
   let active=false,stream:MediaStream|null=null,recorder:MediaRecorder|null=null,context:AudioContext|null=null;
   let timer:ReturnType<typeof setInterval>|null=null,controller:AbortController|null=null;
   let input:MediaStreamAudioSourceNode|null=null,analyser:AnalyserNode|null=null;
   const cleanup=()=>{
     if(timer)clearInterval(timer);timer=null;
-    stream?.getTracks().forEach(track=>track.stop());stream=null;
+    if(!sharedStream)stream?.getTracks().forEach(track=>track.stop());stream=null;
     input?.disconnect();input=null;analyser?.disconnect();analyser=null;
     if(context&&!sharedContext)void context.close().catch(()=>{});context=null;
   };
@@ -31,8 +31,8 @@ export function recordedRecognition(transcribe:(audio:Blob,signal:AbortSignal)=>
       active=true;
       void (async()=>{
         try {
-          const captured=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
-          if(!active){captured.getTracks().forEach(track=>track.stop());return;}
+          const captured=await (sharedStream?sharedStream():navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false}));
+          if(!active){if(!sharedStream)captured.getTracks().forEach(track=>track.stop());return;}
           stream=captured;
           const mime=["audio/webm;codecs=opus","audio/mp4","audio/webm"].find(value=>MediaRecorder.isTypeSupported(value));
           recorder=new MediaRecorder(captured,mime?{mimeType:mime}:undefined);
@@ -66,7 +66,7 @@ export function recordedRecognition(transcribe:(audio:Blob,signal:AbortSignal)=>
             const now=performance.now();
             if(Math.sqrt(sum/samples.length)>0.018){heard=true;lastSound=now;}
             if(!heard&&now-started>8000){port.abort();port.onerror?.({error:"no-speech"});port.onend?.();return;}
-            if((heard&&now-lastSound>1400)||now-started>30000){if(recorder.state==="recording")recorder.stop();}
+            if((heard&&now-lastSound>800)||now-started>30000){if(recorder.state==="recording")recorder.stop();}
           },100);
         }catch(error){
           if(active){port.abort();port.onerror?.({error:(error as Error).name==="NotAllowedError"?"not-allowed":"audio-capture"});port.onend?.();}

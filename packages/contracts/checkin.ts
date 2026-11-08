@@ -5,7 +5,7 @@ const requestId = z.string().min(8).max(100);
 export const StartCheckinSchema = z.object({ requestId }).strict();
 export const AnswerCheckinSchema = z.object({
   requestId, checkinId: z.string().uuid(), text: z.string().min(1).max(2000).refine(s => Boolean(s.trim())),
-  expectedStage: z.enum(["greeting","wellbeing_followup","medications","medication_confirmation","food","readiness","exercise","exercise_review","pain_check","help_confirmation","complete"]).optional(),
+  expectedStage: z.enum(["greeting","wellbeing_followup","medications","medication_confirmation","food","followup","readiness","exercise","exercise_review","pain_check","help_confirmation","complete"]).optional(),
 }).strict();
 export const ContinueCheckinSchema = z.object({
   requestId, checkinId: z.string().uuid(), proposalId: z.string().uuid(),
@@ -19,7 +19,7 @@ export const RehabBridgeEventSchema = z.discriminatedUnion("type", [
 ]);
 export type RehabBridgeEvent = z.infer<typeof RehabBridgeEventSchema>;
 export const ExerciseFeedbackSchema = z.object({ requestId, checkinId: z.string().uuid(), event: RehabBridgeEventSchema }).strict();
-export type MemoryKind = "wellbeing" | "medication_context" | "medication_report" | "food" | "scheduling_pending" | "exercise_readiness" | "exercise_feedback" | "exercise_report" | "exercise_review" | "pain_review";
+export type MemoryKind = "checkin_review" | "wellbeing" | "medication_context" | "medication_report" | "food" | "scheduling_pending" | "exercise_readiness" | "exercise_feedback" | "exercise_report" | "exercise_review" | "pain_review";
 export type ConversationTurn = {id:string;checkinId:string;role:"user"|"assistant";text:string;at:string};
 export type PatientMemoryEvent = {
   id: string; patientId: string; kind: MemoryKind; quote: string; at: string;
@@ -34,4 +34,8 @@ export type CheckinSession = {
   foodKnown?: boolean;
   concernPending?: boolean;
   medicationDetailsRequired?: string[];
+  agendaVersion?: 2;
+  endedAt?: string;
+  foodReviewed?: boolean;
+  followupReviewed?: boolean;
 };

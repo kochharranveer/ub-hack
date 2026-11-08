@@ -9,7 +9,7 @@ import { getCare, callPeer, connected } from "../../../../packages/platform/peer
 import { approvedMedicationTasks } from "../app/today-actions";
 import { PatientMemoryRepository, patientMemory, fingerprint, type MemoryTransaction } from "./patient-memory";
 import { voice, type voiceService } from "./service";
-import {dialogueTurn,medicationLanguage,worseningConcern,type DialogueModel,type Move,type Decision} from "./conversation";
+import {dialogueTurn,medicationLanguage,worseningConcern,patientQuestion,type DialogueModel,type Move,type Decision} from "./conversation";
 import {demoPatientProfile} from "../../../../packages/contracts/fixtures";
 
 type Voice = ReturnType<typeof voiceService>;
@@ -52,7 +52,7 @@ export function checkinService(
       ...(s.exerciseSessionId ? {exerciseSessionId:s.exerciseSessionId} : {}),...extra};
   }
   function remaining(s:CheckinSession) {
-    return s.concernPending ? "wellbeing_followup" : s.medicationIndex<s.medicationTaskIds.length ? "medications" : s.foodKnown ? "readiness" : "food";
+    return s.medicationIndex<s.medicationTaskIds.length ? "medications" : !s.foodReviewed ? "food" : !s.followupReviewed ? "followup" : s.concernPending?"complete":"readiness";
   }
   function question(s: CheckinSession,care: CareSnapshot): VoiceReply {
     const task=care.tasks.find(task=>task.id===s.medicationTaskIds[s.medicationIndex]);
@@ -62,9 +62,11 @@ export function checkinService(
     if(s.stage==="greeting")return reply(s,`Hey${first?", "+first:""}, it's Panda. How ${subject==="you"?"are you feeling":"is "+subject+" feeling"} today?`);
     if(s.stage==="wellbeing_followup")return reply(s,s.concernPending?"Let's put the routine questions aside. What would you like to talk through?":"Can you tell me a little more about how it feels?");
     if(s.stage==="medications"&&medicine&&task&&s.medicationDetailsRequired?.includes(task.id))return reply(s,"Your plan now lists "+medicine.exact+". Have you taken that updated dose?");
+    if(s.stage==="medications"&&medicine&&task?.status==="completed")return reply(s,"I have "+medicine.spoken+" recorded as taken earlier. Is that still right?");
     if(s.stage==="medications")return reply(s,medicine?`Have you taken ${medicine.spoken} ${medicine.precise?"as listed in your plan":medicine.daypart?"":"today"}?`:"What have you had to eat today?");
     if(s.stage==="medication_confirmation"||s.stage==="help_confirmation")return reply(s,"Would you like me to record that?",{proposalId:s.pendingProposalId});
-    if(s.stage==="food")return reply(s,"What have you had to eat today?");
+    if(s.stage==="food")return reply(s,s.foodKnown?"Have you had anything else to eat since your last check-in?":"What have you had to eat today?");
+    if(s.stage==="followup")return reply(s,"When would you like your next care-team check-in? I can note a preference, but booking is still pending.");
     if(s.stage==="readiness")return reply(s,"How are you feeling about doing a little exercise?");
     if(s.stage==="exercise")return reply(s,"Let's open your exercise. I'll stay here with you.",{navigation:"/rehab"});
     if(s.stage==="exercise_review")return reply(s,"How did your arm feel during that?");
@@ -75,7 +77,10 @@ export function checkinService(
     tx.appendDialogue({id:id+":"+role,checkinId:s.id,role,text,at:time()});
   }
   function presented(s:CheckinSession,base:VoiceReply,d:Decision):VoiceReply {
-    return {...base,engine:d.engine,checkin:{id:s.id,stage:s.stage},...(base.proposalId?{speechText:d.response,confirmationPrompt:["respond","med_yes","care_request","care_concern","pain_report"].includes(d.move)}:{message:d.response})};
+    let response=d.response;
+    const advancing=["respond","wellbeing_answer","continue_checkin","med_yes","med_no","med_unsure","food_report","food_unchanged","followup_preference","followup_declined"];
+    if(advancing.includes(d.move)&&["medications","food","followup","readiness"].includes(s.stage)&&!response.includes("?"))response=base.message;
+    return {...base,engine:d.engine,checkin:{id:s.id,stage:s.stage},...(base.proposalId?{speechText:response,confirmationPrompt:["respond","med_yes","care_request","care_concern","pain_report"].includes(d.move)}:{message:response})};
   }
   function reports(tx:MemoryTransaction) {
     const topics:MemoryKind[]=["wellbeing","food","medication_report","pain_review","exercise_report","exercise_review","exercise_readiness"];
@@ -136,12 +141,12 @@ export function checkinService(
         let s=tx.latestSession();
         const changed=s && (s.planId !== care.plan!.id || s.planVersion !== care.plan!.version);
         const tooOld=s && now()-Date.parse(s.updatedAt)>24*60*60*1000;
-        if (!s || s.stage==="complete" || changed || tooOld) {
-          const meds=medicationTasks(care).filter(t=>t.status==="pending");
+        if (!s || s.endedAt || s.stage==="complete" || changed || tooOld || (s.agendaVersion!==2&&!s.pendingProposalId&&!s.exerciseSessionId)) {
+          const meds=medicationTasks(care);
           const baseline=tx.events("medication_context",200);
           const required=meds.filter(task=>{const current=medicationLanguage(task,meds);const old=baseline.find(e=>e.metadata.name===current.key);return Boolean(old&&old.metadata.title!==task.title);}).map(t=>t.id);
           s={id:randomUUID(),patientId:care.patientId,planId:care.plan!.id,planVersion:care.plan!.version,
-            stage:"greeting",foodKnown:tx.events("food").some(e=>time().slice(0,10)===e.at.slice(0,10)),concernPending:care.help.some(h=>h.status==="open"&&worseningConcern(h.quote)),medicationDetailsRequired:required,medicationTaskIds:meds.map(t=>t.id),medicationIndex:0,startedAt:time(),updatedAt:time()};
+            stage:"greeting",agendaVersion:2,foodReviewed:false,followupReviewed:false,foodKnown:tx.events("food").some(e=>time().slice(0,10)===e.at.slice(0,10)),concernPending:care.help.some(h=>h.status==="open"&&worseningConcern(h.quote)),medicationDetailsRequired:required,medicationTaskIds:meds.map(t=>t.id),medicationIndex:0,startedAt:time(),updatedAt:time()};
           save(tx,s);
           for(const task of meds)event(tx,s,v.requestId+":"+task.id,"medication_context",task.title,"system",{name:medicationLanguage(task,meds).key,title:task.title});
         }
@@ -171,27 +176,36 @@ export function checkinService(
       return once(v,{op:"answer",...v},signal,async(tx,care)=>{
         const s=requireSession(tx,v.checkinId,care);
         if(v.expectedStage&&s.stage!==v.expectedStage)throw new DomainError("CONFLICT","The conversation moved to another step. Resume it before answering.");
+        if(s.agendaVersion!==2&&!s.pendingProposalId){s.agendaVersion=2;s.medicationTaskIds=medicationTasks(care).map(t=>t.id);s.medicationIndex=0;s.foodReviewed=false;s.followupReviewed=false;}
         const next={...s,medicationIndex:s.medicationIndex+1};
         const task=care.tasks.find(t=>t.id===s.medicationTaskIds[s.medicationIndex]);
         const med=task&&medicationLanguage(task,medicationTasks(care),s.medicationDetailsRequired?.includes(task.id));
         const goal=(stage:CheckinSession["stage"])=>question({...s,stage},care).message;
         const moves:Move[]=[
           {id:"question",goal:"Answer the patient's actual question from documented facts and attributed reports. If diagnosis/procedure is missing say so, without guessing or dumping instructions. Stay with their question; don't advance the check-in.",fallback:"I can help with what's in your plan, but I don't have a diagnosis or procedure recorded here. What would you like to know?"},
-          {id:"chat",goal:"Respond to this social/ambiguous turn naturally. Stay on the current topic without forcing yes/no. Do not mark any check-in answered.",fallback:s.stage==="complete"?"I'm here. What would you like to talk about?":question(s,care).message},
+          {id:"chat",goal:"Respond briefly to a social/ambiguous turn. Do not close the call while routine topics are pending. If the patient says they have no questions or wants to move on, choose continue_checkin instead. Do not mark any check-in answered.",fallback:s.stage==="complete"?"I'm here. What would you like to talk about?":question(s,care).message},
           {id:"care_request",goal:"Acknowledge their explicit wish to contact the care team. Ask permission to record the exact concern for review, never claim delivery or acknowledgement.",fallback:"Would you like me to record that for your care team to review?"},
           {id:"care_concern",goal:"Their pain is worsening or concerning. Put exercise and routine questions aside. Acknowledge it, suggest contacting their care team promptly, and ask permission to record their exact words for review. This app is not monitored, so don't imply this request replaces getting medical help.",fallback:"I'm sorry your elbow's getting worse. Let's pause the exercise and contact your care team promptly. Would you like me to record what you've told me for their review?"},
-          {id:"symptom_detail",goal:"Acknowledge the discomfort in their own words and ask ONE relevant follow-up about what changed or when it started. Pause routine check-in questions and don't diagnose or reassure.",fallback:"I'm sorry it's bothering you. What's changed since we last spoke?"},
+          {id:"symptom_detail",goal:"Acknowledge the discomfort in their own words and ask ONE relevant follow-up about what changed or when it started. Pause routine check-in questions and don't diagnose or reassure.",fallback:/\bsullen\b/i.test(v.text)?"Did you mean your elbow is swollen?":"I'm sorry it's bothering you. What's changed since we last spoke?"},
         ];
-        if(["greeting","wellbeing_followup"].includes(s.stage))moves.push({id:"wellbeing_answer",goal:s.concernPending?"Acknowledge how they feel now. A care concern is still pending, so stay available for their questions without suggesting exercise or routine checklist progression.":"Acknowledge how they feel, then gently transition to this one next topic: "+goal(remaining(s)),fallback:"Good to hear how you're doing. "+goal(remaining(s))});
+        if(["greeting","wellbeing_followup"].includes(s.stage))moves.push({id:"wellbeing_answer",goal:"Acknowledge how they feel, then ASK the next routine question: "+goal(remaining(s))+". An older pending concern holds exercise, but does NOT cancel medicine, food or follow-up checks. Do not end with an open invitation instead of this question.",fallback:"Good to hear how you're doing. "+goal(remaining(s))});
+        if(!s.pendingProposalId&&s.stage!=="exercise")moves.push({id:"continue_checkin",goal:"They have no more questions, thanked you, or asked to move on. Do not say goodbye. ASK this next required question: "+goal(remaining(s)),fallback:goal(remaining(s))});
+        if(!s.pendingProposalId&&(/\b(?:bye|goodbye|good night|end (?:the |this )?call|stop (?:the |this )?(?:call|conversation)|hang up)\b/i.test(v.text)||s.stage==="complete"))moves.push({id:"end_call",goal:"They explicitly want to end the call (or all check-ins are covered and they are saying goodbye). Give a short warm goodbye, do not ask another question. Never mark unanswered topics completed.",fallback:"Take care. We can pick up again whenever you're ready."});
         if(s.stage==="medications")moves.push(
-          {id:"med_yes",goal:`They clearly report taking the medicine. Acknowledge briefly and ask if you should mark ${med?.spoken||"it"} taken. This only creates a proposal; it has not been saved in Care yet.`,fallback:`Got it. Shall I mark ${med?.spoken||"it"} as taken?`},
+          {id:"med_yes",goal:`They clearly report taking the medicine. Acknowledge briefly. ${task?.status==="completed"?"The task is ALREADY completed; do not propose or record it again. Ask the next food question: "+goal(remaining(next)):"Ask if you should mark "+(med?.spoken||"it")+" taken. This creates a proposal, not a saved Care action."}`,fallback:task?.status==="completed"?"Got it. "+goal(remaining(next)):`Got it. Shall I mark ${med?.spoken||"it"} as taken?`},
           {id:"med_no",goal:"They have not taken it. Acknowledge without judgment or catch-up dosing advice, then move to: "+goal(remaining(next)),fallback:"Okay, thanks for letting me know. "+goal(remaining(next))},
           {id:"med_unsure",goal:"They are unsure. Do not mark the task done or recommend another dose. Acknowledge uncertainty and move gently to: "+goal(remaining(next)),fallback:"That's okay—let's leave it unconfirmed. "+goal(remaining(next))});
-        if(s.stage==="food")moves.push({id:"food_report",goal:"They reported a meal/snack or not eating. Acknowledge what they actually said without judging it. Then ask this one next question: "+goal(s.concernPending?"wellbeing_followup":"readiness")+". Booking availability is pending; do not announce it unless they asked about booking.",fallback:"Got it. "+goal(s.concernPending?"wellbeing_followup":"readiness")});
+        if(s.stage==="food"&&s.foodKnown)moves.push({id:"food_unchanged",goal:"They have eaten nothing more since the meal already recorded. Retain that meal; do not save no/unchanged as a food. ASK the next follow-up question: "+goal("followup"),fallback:"Okay. "+goal("followup")});
+        if(s.stage==="food")moves.push({id:"food_report",goal:"They reported a meal/snack or not eating. Acknowledge what they actually said without judging it. Then ask this one next question: "+goal("followup")+". Booking availability is pending; do not announce it unless they asked about booking.",fallback:"Got it. "+goal("followup")});
+        if(s.stage==="followup")moves.push(
+          {id:"followup_preference",goal:"They give a preferred next check-in time. Note it as a preference only; booking is NOT connected. "+(s.concernPending?"Exercise remains on hold for the concern; say that briefly, then the routine checks are covered.":"ASK whether they are ready for exercise: "+goal("readiness")),fallback:s.concernPending?"I've noted that preference; it isn't booked. Let's leave exercise on hold while your care concern is reviewed. Anything else before we finish?":"I've noted that preference; it isn't booked. "+goal("readiness")},
+          {id:"followup_declined",goal:"They don't want a follow-up or don't have a time yet. Record that without booking. "+(s.concernPending?"Keep exercise on hold for the concern and briefly wrap up the completed routine checks.":"ASK about exercise readiness: "+goal("readiness")),fallback:s.concernPending?"Okay. We'll keep exercise on hold for now. Anything else before we finish?":"Okay. "+goal("readiness")});
         if(s.stage==="readiness"||s.stage==="complete"&&!s.concernPending)moves.push({id:"ready_yes",goal:s.concernPending?"Do not open exercise with an unresolved worsening-pain concern. Keep the conversation with their care concern.":"Only select this if they clearly want to start exercise now. Say you'll stay with them and open the exercise workspace; don't claim measured feedback or correct technique.",fallback:"Let's open the exercise. I'll stay here with you."},{id:"ready_no",goal:"They aren't ready or prefer to talk. Don't close the conversation. Acknowledge and invite their questions; no booking status recitation.",fallback:"No rush—we can leave exercise for later. What would you like to talk about?"});
         if(s.stage==="exercise_review")moves.push({id:"review",goal:"Acknowledge how the session felt specifically, then ask whether there was any pain or discomfort. Don't call the exercise beneficial or correct.",fallback:"Thanks for telling me. Did you notice any pain or discomfort?"});
         if(s.stage==="pain_check")moves.push({id:"pain_none",goal:"They report no pain/discomfort. Acknowledge briefly and leave the conversation open for their questions. No redundant medical/scheduling boilerplate.",fallback:"Good to know. Is there anything else you'd like to talk through?"},{id:"pain_report",goal:"They described pain/discomfort. Acknowledge, suggest stopping exercise, and offer to record their exact words for care-team review. Do not diagnose or claim someone has been notified.",fallback:"Let's leave exercise there. Would you like me to record that discomfort for your care team to review?"},{id:"pain_more",goal:"They said there was pain but haven't described it. Ask one natural follow-up, not a yes/no form prompt.",fallback:"Can you tell me what the discomfort felt like?"});
-        const allowed=worseningConcern(v.text)?moves.filter(m=>m.id==="care_concern"):moves;
+        const wantsEnd=/\b(?:bye|goodbye|good night|end (?:the |this )?call|stop (?:the |this )?(?:call|conversation)|hang up)\b/i.test(v.text);
+        const resume=!patientQuestion(v.text)&&(/\b(?:let.s (?:go on|move on|continue)|go on|move on)\b/i.test(v.text)||["greeting","wellbeing_followup"].includes(s.stage)&&/\b(?:no (?:more |other )?questions|nothing else|(?:don.t|do not) (?:think I )?(?:have|need) anything else|thank you|thanks)\b/i.test(v.text));
+        const allowed=worseningConcern(v.text)?moves.filter(m=>m.id==="care_concern") : wantsEnd&&moves.some(m=>m.id==="end_call")?moves.filter(m=>m.id==="end_call") : resume&&!["followup","complete","exercise"].includes(s.stage)&&!s.pendingProposalId?moves.filter(m=>m.id==="continue_checkin"):moves;
         const d=await model({care,session:s,history:tx.dialogue(),memory:reports(tx),text:v.text,moves:allowed},signal);
         if(!allowed.some(m=>m.id===d.move)||d.foodQuote&&!v.text.includes(d.foodQuote))throw new DomainError("VALIDATION_ERROR","Unsupported conversation decision or patient quote.",400);
         let base=question(s,care);
@@ -204,8 +218,8 @@ export function checkinService(
           s.pendingProposalId=base.proposalId;s.stage="help_confirmation";
         }else if(d.move==="symptom_detail"){
           event(tx,s,v.requestId,"wellbeing",v.text);s.stage="wellbeing_followup";
-        }else if(d.move==="wellbeing_answer"){
-          event(tx,s,v.requestId,"wellbeing",v.text);s.stage=remaining(s);
+        }else if(d.move==="wellbeing_answer"||d.move==="continue_checkin"){
+          if(d.move==="wellbeing_answer")event(tx,s,v.requestId,"wellbeing",v.text);s.stage=remaining(s);base=question(s,care);
         }else if(["med_yes","med_no","med_unsure"].includes(d.move)){
           if(!task)throw new DomainError("CONFLICT","Medication task changed. Start a refreshed conversation.");
           event(tx,s,v.requestId,"medication_report",v.text,"patient_report",{taskId:task.id,answer:d.move.slice(4),careStatus:task.status});
@@ -213,10 +227,16 @@ export function checkinService(
             base=await assistant.turn({requestId:v.requestId,text:v.text},undefined,{name:"confirm_task",args:{taskId:task.id,expectedRevision:task.revision}});
             s.pendingProposalId=base.proposalId;s.stage="medication_confirmation";
           }else{base=nextMedication(tx,s,care);}
+        }else if(d.move==="food_unchanged"){
+          event(tx,s,v.requestId,"checkin_review",v.text,"patient_report",{topic:"food",unchanged:true});s.foodReviewed=true;s.stage="followup";base=question(s,care);
         }else if(d.move==="food_report"){
           if(!d.foodQuote){event(tx,s,v.requestId,"food",v.text);s.foodKnown=true;}
           event(tx,s,v.requestId,"scheduling_pending","Doctor availability is not connected; no follow-up was booked.","system",{booked:false});
-          s.stage=s.concernPending?"wellbeing_followup":"readiness";
+          s.foodReviewed=true;s.stage="followup";base=question(s,care);
+        }else if(d.move==="followup_preference"||d.move==="followup_declined"){
+          event(tx,s,v.requestId,"scheduling_pending",v.text,"patient_report",{requested:d.move==="followup_preference",booked:false});s.followupReviewed=true;s.stage=s.concernPending?"complete":"readiness";base=question(s,care);
+        }else if(d.move==="end_call"){
+          s.endedAt=time();base=reply(s,d.response,{conversationEnded:true});
         }else if(d.move==="ready_yes"||d.move==="ready_no"){
           event(tx,s,v.requestId,"exercise_readiness",v.text,"patient_report",{ready:d.move==="ready_yes"&&!s.concernPending});
           s.stage=s.concernPending?"wellbeing_followup":d.move==="ready_yes"?"exercise":"complete";

@@ -34,7 +34,7 @@ async function setup(t:test.TestContext,model?:DialogueModel) {
     return checkin.continueAfterConfirmation({requestId:id(),checkinId:reply.checkin!.id,proposalId:reply.proposalId});
   };
   const ready=async()=>{
-    let r=await start();r=await answer(r,"No, not yet");r=await answer(r,"Oatmeal and an apple");r=await answer(r,"Yes");return r;
+    let r=await start();r=await answer(r,"No, not yet");r=await answer(r,"Oatmeal and an apple");r=await answer(r,"Tomorrow morning");r=await answer(r,"Yes");return r;
   };
   const exercise=async(r:VoiceReply)=>{
     const c=await care.snapshot();
@@ -58,7 +58,8 @@ test("guided check-in requires medication confirmation, remembers food, and leav
   r=await x.confirm(r);
   assert.equal(r.checkin?.stage,"food");assert.equal(x.writes(),1);
   r=await x.answer(r,"I ate oatmeal, eggs, and a banana.");
-  assert.equal(r.checkin?.stage,"readiness");assert.doesNotMatch(r.message,/booked|appointment confirmed/i);
+  assert.equal(r.checkin?.stage,"followup");r=await x.answer(r,"Tomorrow morning");
+  assert.equal(r.checkin?.stage,"readiness");assert.match(r.message,/isn.t booked/i);assert.doesNotMatch(r.message,/appointment confirmed/i);
   const remembered=await x.checkin.memory();
   assert.ok(remembered.events.some(e=>e.kind==="food" && e.quote==="I ate oatmeal, eggs, and a banana."));
   assert.ok(remembered.events.some(e=>e.kind==="scheduling_pending" && e.metadata.booked===false));
@@ -233,9 +234,11 @@ test("a changed prescription keeps exact details while a dose question gets a pr
   r=await x.start();assert.match(r.message,/20 mg/);
   assert.ok((await x.checkin.memory()).checkin?.medicationDetailsRequired?.length);
 });
-test("already completed medicine and reported meals are not asked again on a new conversation",async t=>{
-  const x=await setup(t);let r=await x.confirm(await x.answer(await x.start(),"Yes"));r=await x.answer(r,"Oatmeal and fruit");r=await x.answer(r,"No");
-  r=await x.greet();assert.equal(r.checkin?.stage,"greeting");r=await x.answer(r,"I feel okay.");assert.equal(r.checkin?.stage,"readiness");
+test("a new call reviews prior medication and meal reports without duplicate Care writes",async t=>{
+  const x=await setup(t);let r=await x.confirm(await x.answer(await x.start(),"Yes"));r=await x.answer(r,"Oatmeal and fruit");r=await x.answer(r,"Tomorrow morning");r=await x.answer(r,"No");
+  r=await x.greet();assert.equal(r.checkin?.stage,"greeting");r=await x.answer(r,"I feel okay.");assert.equal(r.checkin?.stage,"medications");assert.match(r.message,/recorded.*earlier/i);
+  const writes=x.writes();r=await x.answer(r,"Yes");assert.equal(r.checkin?.stage,"food");assert.equal(x.writes(),writes);assert.equal(r.proposalId,undefined);
+  r=await x.answer(r,"No, nothing else");assert.equal(r.checkin?.stage,"followup");
 });
 test("multiple strengths of the same medicine retain disambiguating details",()=>{
   const care=fixtureCare();const first=care.tasks[0];const second={...first,id:"other-dose",title:"Atorvastatin 20 mg · 1 tablet · 8:00 PM"};
@@ -248,7 +251,7 @@ test("a patient can ask a question while an action is pending without yes becomi
   assert.equal(r.proposalId,proposalId);assert.equal(r.confirmationPrompt,false);assert.match(r.speechText!,/10 mg/);assert.equal(x.writes(),0);
 });
 test("declining exercise leaves ongoing questions available and an explicit later start can open it",async t=>{
-  const x=await setup(t);let r=await x.answer(await x.start(),"No");r=await x.answer(r,"Soup");r=await x.answer(r,"No, not yet");
+  const x=await setup(t);let r=await x.answer(await x.start(),"No");r=await x.answer(r,"Soup");r=await x.answer(r,"Tomorrow morning");r=await x.answer(r,"No, not yet");
   assert.equal(r.checkin?.stage,"complete");r=await x.answer(r,"Do you know what operation I had?");assert.equal(r.checkin?.stage,"complete");
   r=await x.answer(r,"I'm ready to do exercise");assert.equal(r.navigation,"/rehab");
 });
@@ -279,4 +282,34 @@ test("a concern pauses the exercise view and a late owner report cannot replace 
   const late=await x.checkin.exerciseFeedback({requestId:x.id(),checkinId:r.checkin!.id,event:{version:"1.0.0",type:"report_saved",sessionId:session.id}});
   assert.equal(late.checkin?.stage,"help_confirmation");assert.equal(late.proposalId,proposalId);
   assert.ok((await x.checkin.memory()).events.some(e=>e.kind==="exercise_report"));assert.equal(x.writes(),0);
+});
+
+test("an older pain concern cannot suppress this call's medicine, food and follow-up agenda",async t=>{
+  const x=await setup(t);await x.care.confirm("task-demo-001",{requestId:x.id(),expectedRevision:0,evidence:"patient_reported"});
+  await x.care.help({requestId:x.id(),quote:"My elbow pain is getting worse and throbbing."});
+  await x.memory.transaction("pat-demo-001",tx=>tx.append({id:"earlier-food",patientId:"pat-demo-001",kind:"food",quote:"Turkey sandwiches",at:new Date().toISOString(),source:"patient_report",metadata:{}}));
+  let r=await x.greet();r=await x.answer(r,"It's better, but kind of sullen as well.");assert.equal(r.checkin?.stage,"wellbeing_followup");assert.match(r.message,/swollen/i);
+  r=await x.answer(r,"No, let's go on. I don't think I have anything else.");assert.equal(r.checkin?.stage,"medications");assert.match(r.message,/recorded.*earlier/i);
+  const writes=x.writes();r=await x.answer(r,"Yes, that's right");assert.equal(r.checkin?.stage,"food");assert.equal(x.writes(),writes);
+  r=await x.answer(r,"No, nothing else");assert.equal(r.checkin?.stage,"followup");
+  r=await x.answer(r,"Tomorrow morning");assert.equal(r.checkin?.stage,"complete");assert.equal(r.navigation,undefined);
+  const saved=await x.checkin.memory();assert.equal(saved.checkin?.foodReviewed,true);assert.equal(saved.checkin?.followupReviewed,true);assert.equal(saved.checkin?.concernPending,true);
+  assert.ok(saved.events.some(e=>e.kind==="scheduling_pending"&&e.quote==="Tomorrow morning"&&e.metadata.booked===false));
+});
+test("polite acknowledgement during a concern resumes check-ins; explicit goodbye can end early",async t=>{
+  const x=await setup(t);let r=await x.greet();r=await x.answer(r,"Okay, thank you");assert.equal(r.checkin?.stage,"medications");assert.notEqual(r.conversationEnded,true);
+  r=await x.answer(r,"Please end the call");assert.equal(r.conversationEnded,true);assert.equal((await x.checkin.memory()).checkin?.foodReviewed,false);
+  r=await x.greet();assert.equal(r.checkin?.stage,"greeting");
+});
+
+test("politeness does not override a patient's actual question during the greeting",async t=>{
+  const x=await setup(t);let r=await x.greet();r=await x.answer(r,"Thanks. What dose is in my plan?");
+  assert.equal(r.checkin?.stage,"greeting");assert.match(r.message,/10 mg/i);assert.equal(x.writes(),0);
+});
+
+test("a confirmation response cannot replace the next required question with generic availability",async t=>{
+  const x=await setup(t,async input=>input.moves.length===1&&input.moves[0].id==="respond"&&input.session.stage==="food"
+    ?{move:"respond",response:"I'm here whenever you need me.",foodQuote:null,engine:"checkin_workflow"}:dialogueTurn(input));
+  let r=await x.start();r=await x.answer(r,"Yes");r=await x.confirm(r);
+  assert.equal(r.checkin?.stage,"food");assert.match(r.message,/what.*eat.*\?/i);assert.equal(x.writes(),1);
 });

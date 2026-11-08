@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { recordedRecognition, speechInputMode } from "./recorded-recognition";
 import { spokenConfirmation } from "./voice-confirmation";
+import { ConversationMicrophone } from "./conversation-microphone";
 import { ConversationAudio } from "./conversation-audio";
 import type { VoiceContext, VoiceHistoryTurn, VoiceReply } from "@contracts";
 import type { CheckinSession, RehabBridgeEvent } from "../../../../packages/contracts/checkin";
@@ -57,6 +58,7 @@ export function useCompanion() {
   const recognition = useRef<Recognition | null>(null);
   const micRestart = useRef<ReturnType<typeof setTimeout> | null>(null);
   const speaker = useRef(new ConversationAudio());
+  const microphone = useRef(new ConversationMicrophone());
   const speechAbort = useRef<AbortController | null>(null);
   const requests = useRef(new Set<AbortController>());
   const pending = useRef<{ requestId: string; text: string; route:string; checkinId?:string; expectedStage?:string } | null>(null);
@@ -81,7 +83,7 @@ export function useCompanion() {
     handsfree.current=false;
     generation.current++;
     stopMic(); stopSound();
-    speaker.current.close();
+    speaker.current.close();microphone.current.close();
     for (const controller of requests.current) controller.abort();
     requests.current.clear();
     inFlight.current = false;
@@ -192,7 +194,7 @@ export function useCompanion() {
       try { await loadContext(); }
       catch (e) { if ((e as Error).name !== "AbortError" && run === generation.current) setError("Reply saved. Context refresh failed: " + (e as Error).message); }
     } catch (e) {
-      if (live.current && run === generation.current) { setPhase(settledPhase()); setError((e as Error).message); }
+      if (live.current && run === generation.current) { handsfree.current=false;microphone.current.close();setPhase(settledPhase()); setError((e as Error).message); }
     } finally {
       if (run === generation.current) {inFlight.current = false;if (feedbackQueue.current.length) void flushFeedback();}
     }
@@ -221,6 +223,7 @@ export function useCompanion() {
       catch (e) { if ((e as Error).name !== "AbortError" && run === generation.current) setError("Action result received. Refresh Care status: " + (e as Error).message); }
     } catch (e) {
       if (!live.current || run !== generation.current) return;
+      handsfree.current=false;microphone.current.close();
       const err = e as ApiError;
       if (err.status === 409 || err.status === 404) {
         acceptReply({ ...latestReply.current!, proposalId: undefined, message: err.message });
@@ -242,7 +245,7 @@ export function useCompanion() {
       const out=await response.json();
       if(!response.ok||!out.ok)throw Error(out.error?.message||"Transcription unavailable");
       return out.data.text as string;
-    },()=>{if(live.current)setPhase("thinking");},()=>speaker.current.captureContext());
+    },()=>{if(live.current)setPhase("thinking");},()=>speaker.current.captureContext(),()=>microphone.current.open());
     recognition.current = rec;
     rec.lang = "en-US"; rec.continuous = false; rec.interimResults = false;
     const spokenProposal=latestReply.current?.proposalId;
@@ -265,7 +268,7 @@ export function useCompanion() {
       if (recognition.current !== rec || !live.current) return;
       // Silence is normal in a conversation. Keep waiting until the patient ends or mutes it.
       if(e.error==="no-speech"&&handsfree.current){setPhase("listening");return;}
-      failed=true;handsfree.current=false;
+      failed=true;handsfree.current=false;microphone.current.close();
       setError(e.error === "not-allowed" || e.error === "service-not-allowed"
         ? "Microphone access was denied. Allow it in browser settings, then tap the mic again. You can also use Keyboard."
         : e.error === "no-speech" ? "No speech was heard. Tap the mic to try again."
@@ -291,7 +294,8 @@ export function useCompanion() {
     const done = () => {
       if (live.current && token === soundGeneration.current) {
         stopSound(); setPhase(settledPhase());
-        if (handsfree.current) mic();
+        if(latestReply.current?.conversationEnded)handsfree.current=false;
+        if (handsfree.current) mic();else microphone.current.close();
       }
     };
     if (browserFallback || context?.ttsEngine !== "elevenlabs") {
@@ -340,7 +344,7 @@ export function useCompanion() {
       acceptReply(result);
       handsfree.current=Boolean(withVoice && micConsentRef.current && canMic && (context?.ttsEngine!=="elevenlabs" || speechConsentRef.current));
       if (handsfree.current) void speak();
-    } catch(e) {if (live.current && run===generation.current) {setError((e as Error).message);setPhase(settledPhase());}}
+    } catch(e) {if (live.current && run===generation.current) {handsfree.current=false;microphone.current.close();setError((e as Error).message);setPhase(settledPhase());}}
     finally {if (run===generation.current) {inFlight.current=false;if (feedbackQueue.current.length) void flushFeedback();}}
   }
   async function flushFeedback() {
@@ -382,7 +386,8 @@ export function useCompanion() {
       // Resume from the original tap before awaiting permission/network work.
       if(context?.ttsEngine==="elevenlabs"||context?.sttConfigured)await speaker.current.unlock();
       if (!live.current || token!==generation.current) return;
-      if (!micConsentRef.current && navigator.mediaDevices?.getUserMedia) {
+      if(context?.sttConfigured&&"MediaRecorder" in window){await microphone.current.open();}
+      else if (!micConsentRef.current && navigator.mediaDevices?.getUserMedia) {
         permissionStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
         permissionStream.getTracks().forEach(track=>track.stop());permissionStream=undefined;
       }
@@ -392,7 +397,7 @@ export function useCompanion() {
       await beginCheckin(true);
     } catch(e) {
       if (live.current && token===generation.current) {
-        handsfree.current=false;
+        handsfree.current=false;microphone.current.close();
         setError((e as Error).name==="NotAllowedError" ? "Microphone permission was denied. Allow it in browser settings, or use the keyboard." : (e as Error).message);
         setPhase(settledPhase());
       }
@@ -402,7 +407,7 @@ export function useCompanion() {
     }
   }
   function listen() {
-    if (!micConsentRef.current || !canMic) {void activateVoice();return;}
+    if (latestReply.current?.conversationEnded || !micConsentRef.current || !canMic) {void activateVoice();return;}
     const token=generation.current;
     const ready=context?.ttsEngine==="elevenlabs"||context?.sttConfigured?speaker.current.unlock():Promise.resolve();
     void ready.then(()=>{if(live.current&&token===generation.current){handsfree.current=true;mic();}}).catch(()=>{
@@ -412,7 +417,7 @@ export function useCompanion() {
 
   function changeMicConsent(value: boolean) {
     micConsentRef.current=value;setMicConsent(value);
-    if (!value) { stopMic(); if (phase === "listening") setPhase(settledPhase()); }
+    if (!value) { stopMic();microphone.current.close();handsfree.current=false; if (phase === "listening") setPhase(settledPhase()); }
   }
   function changeSpeechConsent(value: boolean) {
     speechConsentRef.current=value;setSpeechConsent(value);

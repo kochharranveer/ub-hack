@@ -38,3 +38,11 @@ test("a temporary model outage retries the identical read-only generation withou
   let calls=0,body="";globalThis.fetch=async(_url,options)=>{calls++;if(calls===1){body=String(options?.body);return new Response(null,{status:503});}assert.equal(String(options?.body),body);return result({move:"med_yes",response:"Shall I mark it taken?",foodQuote:null});};
   const out=await dialogueTurn(input());assert.equal(out.engine,"gemini");assert.equal(calls,2);
 }));
+
+test("voice generation uses a model-compatible low-latency thinking configuration",async()=>{
+  const {conversationThinking}=await import("../apps/panda/src/server/conversation");
+  assert.deepEqual(conversationThinking("gemini-3.6-flash"),{thinkingLevel:"minimal"});
+  assert.deepEqual(conversationThinking("gemini-3.8-flash"),{thinkingLevel:"low"});
+  assert.deepEqual(conversationThinking("gemini-2.5-flash"),{thinkingBudget:0});
+  assert.equal(conversationThinking("test-model"),undefined);
+});

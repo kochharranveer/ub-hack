@@ -237,6 +237,8 @@ try {
   guided=await api("/api/voice/checkin/continue",{requestId:"guided-med-continue",checkinId:guided.checkin.id,proposalId:guided.proposalId});
   assert.equal(guided.checkin.stage,"food");checks++;
   guided=await api("/api/voice/checkin/answer",{requestId:"guided-food",checkinId:guided.checkin.id,expectedStage:guided.checkin.stage,text:"Oatmeal and a banana"});
+  assert.equal(guided.checkin.stage,"followup");checks++;
+  guided=await api("/api/voice/checkin/answer",{requestId:"guided-followup",checkinId:guided.checkin.id,expectedStage:guided.checkin.stage,text:"Tomorrow morning"});
   assert.equal(guided.checkin.stage,"readiness");
   assert.doesNotMatch(guided.message,/appointment confirmed/i);checks++;
   guided=await api("/api/voice/checkin/answer",{requestId:"guided-ready",checkinId:guided.checkin.id,expectedStage:guided.checkin.stage,text:"Yes"});

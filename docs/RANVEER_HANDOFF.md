@@ -43,7 +43,7 @@ The Care help endpoint currently lacks an atomic conditional plan-version argume
 
 ## Live evidence and remaining work
 
-85 automated tests, all three builds,27 connected integration checks and3 standalone checks passed. Gemini routing/memory retrieval and ElevenLabs TTS/STT passed real API checks using synthetic data. Human playback and actual microphone/camera/phone tests are still needed.
+93 automated tests, all three builds,28 connected integration checks and3 standalone checks passed. Gemini routing/memory retrieval and ElevenLabs TTS/STT passed real API checks using synthetic data. Human playback and actual microphone/camera/phone tests are still needed.
 
 Doctor availability and booking remain pending by request. Real pose inference/calibration/rep counting stays with Yuvraj; the existing simulated report is visibly synthetic. Asmita retains clinical plan approval, tasks/help/acknowledgement and future booking ownership. Review the shared Rehab extraction together before merging teammates' camera work.
 
@@ -58,3 +58,5 @@ For medical Q&A, a proposed future approach is approved-plan grounding plus lice
 - [ElevenLabs TTS](https://elevenlabs.io/docs/api-reference/text-to-speech/convert) and [STT](https://elevenlabs.io/docs/api-reference/speech-to-text/convert)
 - [Node22.13 SQLite](https://nodejs.org/download/release/v22.13.1/docs/api/sqlite.html)
 - Installed Next.js documentation under `node_modules/next/dist/docs/`.
+
+Current-call recovery: an older pending concern holds exercise rather than the entire check-in. Medicine/food reconciliation and pending follow-up preferences run each call, without repeating completed Care writes. Optional agendaVersion2/review flags migrate old check-ins, while conversationEnded stops the microphone after an explicit goodbye. The input stream is shared for the active call; stop, cancellation, permission withdrawal and request failure release it. Recording waits800ms of silence; Gemini Flash uses a supported lower thinking setting. Fresh live checks yielded900–1590ms model responses before a quota error; the complete updated live/device flow still needs acceptance after quota is available.
