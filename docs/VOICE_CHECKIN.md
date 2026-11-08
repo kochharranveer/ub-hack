@@ -47,9 +47,9 @@ Keep existing root `.env.local`; never overwrite it when following a quickstart.
 
 - Gemini: `PANDA_AI_MODE=gemini`, `PANDA_GEMINI_API_KEY`, `PANDA_GEMINI_MODEL`.
 - ElevenLabs: `PANDA_TTS_MODE=elevenlabs`, `PANDA_ELEVENLABS_API_KEY`, `PANDA_ELEVENLABS_VOICE_ID`, `PANDA_ELEVENLABS_MODEL_ID`.
-- Recorded STT fallback uses that same ElevenLabs key; `PANDA_STT_MODEL` defaults to `scribe_v2`.
+- Recorded STT uses that same ElevenLabs key; `PANDA_STT_MODEL` defaults to `scribe_v2`.
 
-Native browser speech recognition is preferred when available. Otherwise MediaRecorder sends bounded audio to Panda's server for ElevenLabs transcription. The fallback stops after speech/silence or a maximum 30 seconds, and releases tracks/timers on stop/cancel. This is turn-based listening and speech, not full-duplex interruption handling or an ElevenLabs Agents session. Actual device/browser capture still needs a human test.
+When ElevenLabs transcription is configured and recording is supported, MediaRecorder sends bounded audio to Panda's server directly. Native browser speech recognition is used only when that route is not configured/available; an exposed browser API does not establish that its recognition service works. The recorder stops after speech/silence or a maximum 30 seconds, and releases tracks/timers on stop/cancel. This is turn-based listening and speech, not full-duplex interruption handling or an ElevenLabs Agents session. Actual device/browser capture still needs a human test.
 
 Run `npm run doctor` to see configured/missing field names without secret values. `npm run dev` runs the connected three-app product; standalone `npm run dev:ranveer` uses fixtures, so exercise peers are not available.
 
@@ -58,3 +58,5 @@ Doctor availability/booking remains deliberately pending. No appointment is book
 ## Flowing conversation update
 
 Tap Panda once to start. Replies speak automatically, then recognition resumes without another tap. Silence restarts listening; mute/end, keyboard mode, hidden page or navigation stops it. A separate spoken “confirm”/“cancel” (or clear yes/no to the just-read proposal) resolves the exact pending action. Ambiguous replies re-ask, and ordinary medication reports cannot be interpreted as confirmation. Listening continues after the structured check-in finishes for further questions. The initial tap unlocks one Web Audio context for subsequent reply buffers; Stop invalidates pending decoding so late audio cannot restart the conversation. Physical playback/microphone testing is still required; this remains alternating turns without voice barge-in.
+
+Speech service recovery: configured transcription now takes precedence even when an embedded browser exposes a broken native recognizer. Microphone metering reuses the context unlocked by the initial tap, disconnects capture nodes after each turn, and leaves that context available for replies. Permission, capture and transcription errors have distinct messages; the UI points to the actual Keyboard control. Regression tests cover service selection, recorded-turn delivery, cancellation and capture cleanup.

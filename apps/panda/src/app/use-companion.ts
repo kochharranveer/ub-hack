@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { recordedRecognition } from "./recorded-recognition";
+import { recordedRecognition, speechInputMode } from "./recorded-recognition";
 import { spokenConfirmation } from "./voice-confirmation";
 import { ConversationAudio } from "./conversation-audio";
 import type { VoiceContext, VoiceHistoryTurn, VoiceReply } from "@contracts";
@@ -10,7 +10,7 @@ export type Phase = "permission" | "ready" | "listening" | "thinking" | "confirm
 type Recognition = {
   lang: string; continuous: boolean; interimResults: boolean;
   onresult: ((e: { results: { [key: number]: { [key: number]: { transcript: string } } } }) => void) | null;
-  onerror: ((e: { error: string }) => void) | null;
+  onerror: ((e: { error: string;message?:string }) => void) | null;
   onend: (() => void) | null;
   start(): void; abort(): void;
 };
@@ -118,7 +118,7 @@ export function useCompanion() {
   }
   useEffect(()=>{
     setCanMic(window.isSecureContext && Boolean((window as SpeechWindow).SpeechRecognition || (window as SpeechWindow).webkitSpeechRecognition ||
-      (context?.sttConfigured && "MediaRecorder" in window && navigator.mediaDevices?.getUserMedia)));
+      (context?.sttConfigured && "MediaRecorder" in window && "AudioContext" in window && navigator.mediaDevices?.getUserMedia)));
   },[context?.sttConfigured]);
   useEffect(() => {
     live.current = true;
@@ -232,13 +232,14 @@ export function useCompanion() {
     const Ctor = (window as SpeechWindow).SpeechRecognition || (window as SpeechWindow).webkitSpeechRecognition;
     if (!micConsentRef.current || !canMic || inFlight.current) return;
     stopMic(); stopSound(); setError(""); setNotice("");
-    const rec = Ctor ? new Ctor() : recordedRecognition(async(blob,signal)=>{
-      const form=new FormData();form.set("file",blob,"microphone.webm");
+    const selected=speechInputMode(Boolean(Ctor),Boolean("MediaRecorder" in window&&"AudioContext" in window&&navigator.mediaDevices?.getUserMedia),Boolean(context?.sttConfigured));
+    const rec = selected==="native"&&Ctor ? new Ctor() : recordedRecognition(async(blob,signal)=>{
+      const form=new FormData();form.set("file",blob,/mp4/.test(blob.type)?"microphone.mp4":"microphone.webm");
       const response=await fetch("/api/voice/transcribe",{method:"POST",body:form,signal});
       const out=await response.json();
       if(!response.ok||!out.ok)throw Error(out.error?.message||"Transcription unavailable");
       return out.data.text as string;
-    },()=>{if(live.current)setPhase("thinking");});
+    },()=>{if(live.current)setPhase("thinking");},()=>speaker.current.captureContext());
     recognition.current = rec;
     rec.lang = "en-US"; rec.continuous = false; rec.interimResults = false;
     const spokenProposal=latestReply.current?.proposalId;
@@ -267,9 +268,11 @@ export function useCompanion() {
       if(e.error==="no-speech"&&handsfree.current){setPhase("listening");return;}
       failed=true;handsfree.current=false;
       setError(e.error === "not-allowed" || e.error === "service-not-allowed"
-        ? "Microphone permission was denied. Allow it in browser settings, or type below."
-        : e.error === "no-speech" ? "No speech was heard. Try again or type below."
-        : "Speech recognition is unavailable right now. Type your message below.");
+        ? "Microphone access was denied. Allow it in browser settings, then tap the mic again. You can also use Keyboard."
+        : e.error === "no-speech" ? "No speech was heard. Tap the mic to try again."
+        : e.error === "transcription-unavailable" ? e.message||"Transcription is unavailable. Tap the mic to retry or use Keyboard."
+        : e.error === "audio-capture" ? "The microphone could not record. Check your input device, then tap the mic again."
+        : "Browser speech recognition failed. Tap the mic to retry or use Keyboard.");
       setPhase(settledPhase());
     };
     rec.onend = () => { if (recognition.current === rec && live.current) {
@@ -378,7 +381,7 @@ export function useCompanion() {
     try {
       if (!canMic) throw Error("Speech recognition is unavailable in this browser. Use the keyboard button below.");
       // Resume from the original tap before awaiting permission/network work.
-      if(context?.ttsEngine==="elevenlabs")await speaker.current.unlock();
+      if(context?.ttsEngine==="elevenlabs"||context?.sttConfigured)await speaker.current.unlock();
       if (!live.current || token!==generation.current) return;
       if (!micConsentRef.current && navigator.mediaDevices?.getUserMedia) {
         permissionStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
@@ -402,7 +405,7 @@ export function useCompanion() {
   function listen() {
     if (!micConsentRef.current || !canMic) {void activateVoice();return;}
     const token=generation.current;
-    const ready=context?.ttsEngine==="elevenlabs"?speaker.current.unlock():Promise.resolve();
+    const ready=context?.ttsEngine==="elevenlabs"||context?.sttConfigured?speaker.current.unlock():Promise.resolve();
     void ready.then(()=>{if(live.current&&token===generation.current){handsfree.current=true;mic();}}).catch(()=>{
       if(live.current&&token===generation.current)setError("Audio is unavailable. Use the keyboard to continue.");
     });

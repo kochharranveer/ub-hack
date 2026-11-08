@@ -41,7 +41,7 @@ The Care help endpoint currently lacks an atomic conditional plan-version argume
 
 ## Live evidence and remaining work
 
-63 automated tests, all three builds,27 connected integration checks and3 standalone checks passed. Gemini routing/memory retrieval and ElevenLabs TTS/STT passed real API checks using synthetic data. Human playback and actual microphone/camera/phone tests are still needed.
+67 automated tests, all three builds,27 connected integration checks and3 standalone checks passed. Gemini routing/memory retrieval and ElevenLabs TTS/STT passed real API checks using synthetic data. Human playback and actual microphone/camera/phone tests are still needed.
 
 Doctor availability and booking remain pending by request. Real pose inference/calibration/rep counting stays with Yuvraj; the existing simulated report is visibly synthetic. Asmita retains clinical plan approval, tasks/help/acknowledgement and future booking ownership. Review the shared Rehab extraction together before merging teammates' camera work.
 

@@ -47,7 +47,7 @@ For cross-app navigation and integration, use `npm run dev` and port 3000. Stand
 - Patient-reported task confirmation with revision checks; help recording and separate clinician acknowledgement.
 - Voice command tool dispatcher, server-persisted proposals, explicit user confirmation, idempotent writes through Care APIs.
 - Optional Gemini/OpenAI intent-routing adapters; optional ElevenLabs speech adapter. All secrets stay server-side.
-- Same-page voice/text switching, persistent patient context and guided check-ins. Browser speech recognition or ElevenLabs recorded STT; TTS/read-aloud and stop cleanup.
+- Same-page voice/text switching, persistent patient context and guided check-ins. Configured ElevenLabs recorded STT or native browser speech recognition; TTS/read-aloud and stop cleanup.
 - Camera preview/lifecycle, start/finish session APIs, immutable saved reports and report acknowledgement through Care.
 - A clearly labelled simulated exercise report for verifying integration; it is not measured camera progress.
 - Local persistence, runtime contract validation, domain tests and an integration test against all three production builds.
@@ -65,7 +65,7 @@ Edit root `.env.local`; the root runner loads it for all apps. Never use `NEXT_P
 - Gemini track: `PANDA_AI_MODE=gemini`, `PANDA_GEMINI_API_KEY`, `PANDA_GEMINI_MODEL` (an available model ID, without `models/`).
 - Optional OpenAI alternative: `PANDA_AI_MODE=openai`, `PANDA_OPENAI_API_KEY`, `PANDA_OPENAI_MODEL`.
 - ElevenLabs track: `PANDA_TTS_MODE=elevenlabs`, `PANDA_ELEVENLABS_API_KEY`, `PANDA_ELEVENLABS_VOICE_ID`, `PANDA_ELEVENLABS_MODEL_ID`.
-- Recorded STT fallback: `PANDA_STT_MODEL=scribe_v2` by default, using the same server-side ElevenLabs key.
+- Recorded STT: `PANDA_STT_MODEL=scribe_v2` by default, using the same server-side ElevenLabs key.
 - No credentials: `PANDA_AI_MODE=demo`, `PANDA_TTS_MODE=browser`; the UI labels demo rules and browser speech.
 
 Configured provider failures surface as failures; they never silently turn into a successful mock. Use synthetic data for external-provider tests. Model availability and account access must be checked in your own provider account.

@@ -2,7 +2,7 @@
 
 Synthetic MVP verification; this is not clinical-product acceptance.
 
-- `npm run check`: TypeScript across three apps and **63 tests, zero failures**. Includes medication confirmation, food/context persistence, patient separation, recovery, stale-step protection, owner-verified exercise feedback, post-exercise review, pain proposals and transcription boundaries. Additional checks cover clear/ambiguous spoken confirmations, automatic next-turn audio callbacks, cancellation during decoding and playback cleanup.
+- `npm run check`: TypeScript across three apps and **67 tests, zero failures**. Includes medication confirmation, food/context persistence, patient separation, recovery, stale-step protection, owner-verified exercise feedback, post-exercise review, pain proposals and transcription boundaries. Additional checks cover clear/ambiguous spoken confirmations, automatic next-turn audio callbacks, cancellation during decoding and playback cleanup.
 - `npm run build`: all three apps passed; Panda rebuilt after the final inline UI and expired-confirmation recovery change.
 - `npm run test:integration`: **27 connected checks plus three standalone fixture checks passed**. Exercises the gateway, source/revision/idempotency rules and full check-in → report → review → permanent-memory flow.
 - Browser: keyboard replaces Panda inline; bottom button becomes microphone; switching back restores Panda without a dialog. The synthetic medication → food → readiness → embedded exercise → simulated report → feelings → pain review completed at the same URL. Desktop text mode had no document overflow. Earlier compact-home QA covered 390×844, 320×568, 844×390 and 1366×768; the final keyboard layout has not been verified on a physical phone.
@@ -26,3 +26,5 @@ The integration runner uses isolated temporary storage. Provider tests spend pro
 Still pending: doctor availability/booking, real pose inference, actual microphone/camera/phone/background tests, human audio playback, teammate acceptance, production sign-in/authorization/quotas/database/HTTPS, EHR/CRM integration, medical-reference grounding and clinician-reviewed medical-answer evaluations. No clinical correctness, real clinician delivery, emergency dispatch or HIPAA compliance is claimed.
 
 See [check-in integration](docs/VOICE_CHECKIN.md) and [handoff](docs/RANVEER_HANDOFF.md).
+
+Speech recognition fix: configured server transcription bypasses exposed native recognizers. Four regression checks verify selection, capture-to-transcription delivery, aborting delayed transcription and recorder-failure cleanup. Capture metering uses the already-unlocked conversation audio context.

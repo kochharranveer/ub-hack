@@ -4,9 +4,10 @@ export class ConversationAudio {
   private source: AudioBufferSourceNode | null=null;
   private generation=0;
   constructor(private readonly create:()=>AudioContext=()=>new AudioContext()) {}
+  captureContext() {return this.context ??= this.create();}
   unlock() {
-    this.context ??= this.create();
-    return this.context.state==="running" ? Promise.resolve() : this.context.resume();
+    this.captureContext();
+    return this.context!.state==="running" ? Promise.resolve() : this.context!.resume();
   }
   stop() {
     this.generation++;

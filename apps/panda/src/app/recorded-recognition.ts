@@ -1,17 +1,23 @@
 export type SpeechInput = {
   lang:string;continuous:boolean;interimResults:boolean;
   onresult:((event:{results:{[key:number]:{[key:number]:{transcript:string}}}})=>void)|null;
-  onerror:((event:{error:string})=>void)|null;onend:(()=>void)|null;
+  onerror:((event:{error:string;message?:string})=>void)|null;onend:(()=>void)|null;
   start:()=>void;abort:()=>void;
 };
-/** Bounded microphone turn for browsers without Web Speech. Audio is discarded on cancel. */
-export function recordedRecognition(transcribe:(audio:Blob,signal:AbortSignal)=>Promise<string>,processing:()=>void):SpeechInput {
+// Some embedded browsers expose Web Speech while their recognition service is unavailable.
+export function speechInputMode(nativeAvailable:boolean,recordingAvailable:boolean,transcriptionConfigured:boolean) {
+  return transcriptionConfigured&&recordingAvailable ? "recorded" : nativeAvailable ? "native" : undefined;
+}
+/** Bounded microphone turn; configured server transcription is preferred to browser recognition. */
+export function recordedRecognition(transcribe:(audio:Blob,signal:AbortSignal)=>Promise<string>,processing:()=>void,sharedContext?:()=>AudioContext):SpeechInput {
   let active=false,stream:MediaStream|null=null,recorder:MediaRecorder|null=null,context:AudioContext|null=null;
   let timer:ReturnType<typeof setInterval>|null=null,controller:AbortController|null=null;
+  let input:MediaStreamAudioSourceNode|null=null,analyser:AnalyserNode|null=null;
   const cleanup=()=>{
     if(timer)clearInterval(timer);timer=null;
     stream?.getTracks().forEach(track=>track.stop());stream=null;
-    if(context)void context.close().catch(()=>{});context=null;
+    input?.disconnect();input=null;analyser?.disconnect();analyser=null;
+    if(context&&!sharedContext)void context.close().catch(()=>{});context=null;
   };
   const port:SpeechInput={
     lang:"en-US",continuous:false,interimResults:false,onresult:null,onerror:null,onend:null,
@@ -32,6 +38,7 @@ export function recordedRecognition(transcribe:(audio:Blob,signal:AbortSignal)=>
           recorder=new MediaRecorder(captured,mime?{mimeType:mime}:undefined);
           const chunks:Blob[]=[];
           recorder.ondataavailable=event=>{if(active&&event.data.size)chunks.push(event.data);};
+          recorder.onerror=()=>{if(active){port.abort();port.onerror?.({error:"audio-capture"});port.onend?.();}};
           recorder.onstop=()=>{
             const audio=new Blob(chunks,{type:recorder?.mimeType||mime||"audio/webm"});
             cleanup();
@@ -42,18 +49,19 @@ export function recordedRecognition(transcribe:(audio:Blob,signal:AbortSignal)=>
               port.onresult?.({results:{0:{0:{transcript:text}}}});
               if(active){active=false;port.onend?.();}
             }).catch(error=>{
-              if(active){active=false;port.onerror?.({error:error instanceof Error?error.message:"network"});port.onend?.();}
+              if(active){active=false;port.onerror?.({error:"transcription-unavailable",message:error instanceof Error?error.message:"Speech transcription is unavailable."});port.onend?.();}
             });
           };
           recorder.start(200);
-          context=new AudioContext();await context.resume();
-          const analyser=context.createAnalyser();analyser.fftSize=1024;
-          context.createMediaStreamSource(captured).connect(analyser);
-          const samples=new Uint8Array(analyser.fftSize);
+          context=sharedContext?sharedContext():new AudioContext();await context.resume();
+          if(!active)return;
+          const meter=context.createAnalyser();meter.fftSize=1024;analyser=meter;
+          input=context.createMediaStreamSource(captured);input.connect(meter);
+          const samples=new Uint8Array(meter.fftSize);
           const started=performance.now();let heard=false,lastSound=started;
           timer=setInterval(()=>{
             if(!active||!recorder)return;
-            analyser.getByteTimeDomainData(samples);
+            meter.getByteTimeDomainData(samples);
             let sum=0;for(const sample of samples){const value=(sample-128)/128;sum+=value*value;}
             const now=performance.now();
             if(Math.sqrt(sum/samples.length)>0.018){heard=true;lastSound=now;}
@@ -61,8 +69,7 @@ export function recordedRecognition(transcribe:(audio:Blob,signal:AbortSignal)=>
             if((heard&&now-lastSound>1400)||now-started>30000){if(recorder.state==="recording")recorder.stop();}
           },100);
         }catch(error){
-          cleanup();
-          if(active){active=false;port.onerror?.({error:(error as Error).name==="NotAllowedError"?"not-allowed":"audio-capture"});port.onend?.();}
+          if(active){port.abort();port.onerror?.({error:(error as Error).name==="NotAllowedError"?"not-allowed":"audio-capture"});port.onend?.();}
         }
       })();
     },

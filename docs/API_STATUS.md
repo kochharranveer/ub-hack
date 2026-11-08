@@ -8,7 +8,7 @@
 | Voice tool proposal/confirmation and sourced-plan output | Implemented; demo rules and live Gemini tested | R: physical microphone/playback tests, prompt evaluation, latency and better turn-taking |
 | Gemini/OpenAI model adapters | Gemini live tested with synthetic plan/memory; OpenAI boundary tested with mocks | R: select account-available model and record actual successful call |
 | ElevenLabs speech | TTS and scribe_v2 STT passed live synthetic-audio API tests | R: live audio test, controls/error UI; full-duplex Agents optional |
-| Browser microphone/read-aloud | Native recognition plus recorded STT fallback, inline mode switching and cleanup | R: actual phone/browser tests; browser STT availability varies |
+| Browser microphone/read-aloud | Configured ElevenLabs STT preferred; native recognition otherwise, inline mode switching and cleanup | R: actual phone/browser tests; browser STT availability varies |
 | Camera preview / cleanup | Implemented | Y: actual permission/device/background checks |
 | Pose inference / calibration / measured reps | NOT implemented | Y: core physical-AI milestone; pinned model/assets and confidence tests |
 | Session persistence / report fetch / acknowledgement | Implemented, integration tested with explicit simulated evidence | Y: real measurements; A: clinician report workflow polish |
