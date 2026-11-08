@@ -1,5 +1,7 @@
 # Ranveer implementation and integration handoff
 
+Current conversational model/flow and new fields are documented in [CONVERSATION_DESIGN.md](CONVERSATION_DESIGN.md).
+
 Branch `ranveer/voice`, based on `ce405fd027e6d8b1d872d00501353c1c21a2a456`. Shared wire contract2.0.0 is preserved with additive Panda APIs and bridge1.0.0. This AI-assisted synthetic MVP now includes persistent patient context and continuous voice in the guided exercise flow, following Ranveer's expanded request.
 
 ## Implemented
@@ -41,7 +43,7 @@ The Care help endpoint currently lacks an atomic conditional plan-version argume
 
 ## Live evidence and remaining work
 
-67 automated tests, all three builds,27 connected integration checks and3 standalone checks passed. Gemini routing/memory retrieval and ElevenLabs TTS/STT passed real API checks using synthetic data. Human playback and actual microphone/camera/phone tests are still needed.
+85 automated tests, all three builds,27 connected integration checks and3 standalone checks passed. Gemini routing/memory retrieval and ElevenLabs TTS/STT passed real API checks using synthetic data. Human playback and actual microphone/camera/phone tests are still needed.
 
 Doctor availability and booking remain pending by request. Real pose inference/calibration/rep counting stays with Yuvraj; the existing simulated report is visibly synthetic. Asmita retains clinical plan approval, tasks/help/acknowledgement and future booking ownership. Review the shared Rehab extraction together before merging teammates' camera work.
 

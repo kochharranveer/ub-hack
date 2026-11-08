@@ -21,7 +21,6 @@ export default function Panda() {
   const dialog=useRef<HTMLDialogElement>(null),composer=useRef<HTMLTextAreaElement>(null);
   const medicines=approvedMedicationTasks(c.context),plan=c.context?.plan,firstName=c.context?.patient?.firstName;
   const active=!["ready","confirmation"].includes(c.phase);
-  const engine=c.reply?.engine==="checkin_workflow" ? "Guided check-in" : c.context?.aiEngine==="gemini" ? "Gemini" : c.context?.aiEngine==="openai" ? "OpenAI" : "Demo rules";
   useEffect(()=>{
     if(panel&&!dialog.current?.open)dialog.current?.showModal();
     if(!panel&&dialog.current?.open)dialog.current?.close();
@@ -29,6 +28,7 @@ export default function Panda() {
   useEffect(()=>{if(mode==="text")composer.current?.focus();},[mode,exerciseOpen]);
   useEffect(()=>{if(!c.text)setDirectDraft(false);},[c.text]);
   useEffect(()=>{
+    if(c.reply?.pauseExercise){setExerciseOpen(false);return;}
     if(c.reply?.checkin?.stage==="exercise"&&c.reply.navigation==="/rehab")setExerciseOpen(true);
     if(c.reply?.checkin&&["exercise_review","pain_check"].includes(c.reply.checkin.stage))setMode(current=>current==="idle"?"voice":current);
   },[c.reply]);
@@ -55,7 +55,7 @@ export default function Panda() {
   function replyText() {
     return <div className={styles.inlineReply} role="status" aria-live="polite">
       {c.busy&&<strong>{c.phase==="saving"?"Saving your choice…":"Thinking…"}</strong>}
-      {c.error?<p className="error">{c.error}</p>:c.reply?<p>{c.reply.message}</p>:<p>What’s on your mind?</p>}
+      {c.error?<p className="error">{c.error}</p>:c.reply?<><p>{c.reply.speechText||c.reply.message}</p>{c.reply.speechText&&c.reply.speechText!==c.reply.message&&<details><summary>Review exact action</summary><p>{c.reply.message}</p></details>}</>:<p>What’s on your mind?</p>}
       {c.reply?.sourceRefs?.length?<small>Sources: {c.reply.sourceRefs.join(" · ")}</small>:null}
     </div>;
   }
@@ -65,7 +65,7 @@ export default function Panda() {
       <form onSubmit={event=>{event.preventDefault();void c.send(c.text,directDraft);}}>
         <label className={styles.srOnly} htmlFor="message">Your message</label>
         <textarea ref={composer} id="message" rows={2} value={c.text} maxLength={2000} placeholder="Type to Panda…" onChange={event=>c.setText(event.target.value)} />
-        <div className={styles.inlineSend}><small>{engine} · {c.checkin?.stage?.replaceAll("_"," ")??"patient context"}</small><button type="submit" disabled={c.busy||!c.text.trim()}>Send ↑</button></div>
+        <div className={styles.inlineSend}><small>Your conversation with Panda</small><button type="submit" disabled={c.busy||!c.text.trim()}>Send ↑</button></div>
       </form>
     </div>;
     if(mode==="voice")return <div className={styles.inlineVoice} data-active={active} aria-label="Voice conversation">
@@ -76,7 +76,7 @@ export default function Panda() {
         <button type="button" className="secondary" aria-label="End voice conversation" onClick={()=>{c.stop();setMode("idle");}}>×</button>
         <button type="button" aria-label={active?"Mute conversation":"Resume conversation"} onClick={()=>active?c.stop():c.listen()}>{active?"■":<MicIcon />}</button>
       </div>
-      <small className={styles.inlineCaption}>{engine} · {c.context?.ttsEngine==="elevenlabs"?"ElevenLabs":"browser voice"}</small>
+      <small className={styles.inlineCaption}>{active?"Take your time.":"Tap the mic to continue."}</small>
     </div>;
     return <><button type="button" className={styles.panda} onClick={talk} aria-label="Talk to Panda"><span className={styles.face}><PandaFace /></span><small>Tap to talk to</small><strong>panda</strong><span className={styles.micMark} aria-hidden="true">◉</span></button>
       {c.reply?.proposalId?<button type="button" className={styles.textButton} onClick={()=>setMode("text")}>Review pending action →</button>:<p className={styles.privacyCaption}>Voice uses browser speech{c.context?.sttConfigured?" or ElevenLabs transcription":""}.<br/>Check-in answers are remembered for this patient.</p>}
@@ -103,7 +103,7 @@ export default function Panda() {
     <dialog ref={dialog} className={styles.dialog} aria-labelledby="dialog-title" onCancel={event=>{event.preventDefault();setPanel(null);}}>
       <button type="button" className={styles.dialogClose} aria-label="Close dialog" onClick={()=>setPanel(null)}>×</button>
       {panel==="emergency"?<><span className="eyebrow">Emergency information</span><h2 id="dialog-title">Panda cannot call for help.</h2><p>This demonstration is not monitored and cannot contact emergency services. For urgent help, contact your local emergency services directly.</p><p>Care requests are recorded for separate acknowledgement.</p></>:
-        panel==="memory"?<><span className="eyebrow">Patient-scoped memory</span><h2 id="dialog-title">What Panda remembers</h2><p>Check-in answers remain until explicitly deleted. Plans and exercise reports remain in their own apps.</p>{memoryError&&<p role="alert">{memoryError}</p>}{!remembered?<p>Loading…</p>:<><small>{remembered.totalEvents} remembered entries · current patient only</small>{remembered.events.map(entry=><div className={styles.memoryEntry} key={entry.id}><small>{entry.kind.replaceAll("_"," ")} · {entry.at}</small><p>{entry.quote}</p><small>{entry.source.replaceAll("_"," ")}</small></div>)}{!remembered.events.length&&<p>No check-in answers yet.</p>}</>}</>:
+        panel==="memory"?<><span className="eyebrow">Patient-scoped memory</span><h2 id="dialog-title">What Panda remembers</h2><p>Check-in answers remain until explicitly deleted. Plans and exercise reports remain in their own apps.</p>{memoryError&&<p role="alert">{memoryError}</p>}{!remembered?<p>Loading…</p>:<><small>{remembered.totalEvents} remembered entries · current patient only</small>{remembered.events.map(entry=><div className={styles.memoryEntry} key={entry.id}><small>{entry.kind.replaceAll("_"," ")} · {entry.at}</small><p>{entry.quote}</p><small>{entry.source.replaceAll("_"," ")}</small></div>)}{!remembered.events.length&&<p>No check-in answers yet.</p>}{remembered.transcript?.length?<details><summary>Conversation transcript</summary>{remembered.transcript.map(turn=><div className={styles.memoryEntry} key={turn.id}><strong>{turn.role==="user"?"You":"Panda"}</strong><p>{turn.text}</p></div>)}</details>:null}</>}</>:
         <><span className="eyebrow">Approved plan · v{plan?.version??"—"}</span><h2 id="dialog-title">Your medicines</h2>{medicines.length?medicines.map(task=><div className={styles.medicine} key={task.id}><p>{task.title}</p><small>{task.status==="completed"?"Completed · patient-reported":"Exact text from the approved demonstration plan"}</small>{task.status==="pending"&&<button type="button" disabled={c.busy} onClick={()=>{setPanel(null);setMode("text");void c.send("Confirm task "+task.id,true);}}>Report done</button>}</div>):<p>Medicine details are not available in your approved plan yet.</p>}<a className="button secondary" href="/care" onClick={c.stop}>Open full plan</a><small className={styles.finePrint}>Synthetic examples only.</small></>}
     </dialog>
   </div>;

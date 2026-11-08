@@ -92,7 +92,7 @@ test("ElevenLabs request returns audio with keys only in headers", async () => e
   globalThis.fetch = async (url, options) => {
     assert.equal(String(url), "https://api.elevenlabs.io/v1/text-to-speech/test-voice?output_format=mp3_44100_128");
     assert.equal(new Headers(options?.headers).get("xi-api-key"), "fake-secret");
-    assert.deepEqual(JSON.parse(String(options?.body)), { text: "Synthetic test.", model_id: "test-model" });
+    assert.deepEqual(JSON.parse(String(options?.body)), { text: "Synthetic test.", model_id: "test-model",voice_settings:{stability:0.4,similarity_boost:0.75,style:0,speed:1} });
     assert.ok(options?.signal);
     return new Response(new Uint8Array([73, 68, 51]), { headers: { "Content-Type": "audio/mpeg" } });
   };

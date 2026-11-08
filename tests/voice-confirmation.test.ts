@@ -12,3 +12,11 @@ test("medication reports and ambiguous or negated speech never implicitly confir
   for(const text of ["I took it","yes I took my medicines","maybe","yes but wait","don't go ahead","not sure","confirm if my doctor says so","yes, no"])
     assert.equal(spokenConfirmation(text),undefined,text);
 });
+
+test("yes/no after an intervening patient question cannot confirm a pending clinical action",()=>{
+  assert.equal(spokenConfirmation("yes",false),undefined);
+  assert.equal(spokenConfirmation("no",false),undefined);
+  assert.equal(spokenConfirmation("confirm it",false),"confirm");
+  assert.equal(spokenConfirmation("confirm",false),"confirm");
+  assert.equal(spokenConfirmation("cancel it",false),"cancel");
+});

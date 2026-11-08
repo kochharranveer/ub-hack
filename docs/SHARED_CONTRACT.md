@@ -57,3 +57,5 @@ Local JSON persistence is serialized per file inside one Node process and writte
 ## Auth boundary for the next milestone
 
 This demo has no sign-in or clinical authorization. Production: verified same-origin session cookie, CSRF/origin checks for writes, scoped service-to-service credentials with actor/patient context, and domain-specific authorization in every API. Do not trust browser-supplied role/patient IDs. Restrict patient-visible snapshots; clinician drafts and private help notes must not leak. A shared cookie is not a substitute for server authorization.
+
+The contextual conversation extension adds `speechText?`, `confirmationPrompt?`, greeting/wellbeing-followup stages, optional continuation confirmation text, and patient-scoped transcript retrieval through the memory response. See [CONVERSATION_DESIGN.md](CONVERSATION_DESIGN.md). Existing Care/Rehab mutation payloads remain unchanged.

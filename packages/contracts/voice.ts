@@ -39,10 +39,13 @@ export type VoiceReply = {
   mode: "fixture" | "connected";
   engine: "demo_rules" | "openai" | "gemini" | "checkin_workflow";
   message: string;
+  speechText?: string;
+  confirmationPrompt?: boolean;
+  pauseExercise?: boolean;
   proposalId?: string;
   navigation?: "/rehab";
   sourceRefs?: string[];
-  checkin?: { id: string; stage: "medications" | "medication_confirmation" | "food" | "readiness" | "exercise" | "exercise_review" | "pain_check" | "help_confirmation" | "complete" };
+  checkin?: { id: string; stage: "greeting" | "wellbeing_followup" | "medications" | "medication_confirmation" | "food" | "readiness" | "exercise" | "exercise_review" | "pain_check" | "help_confirmation" | "complete" };
   exerciseSessionId?: string;
 };
 // Additive Panda-only endpoint types; Care/Rehab v2 shapes remain unchanged.

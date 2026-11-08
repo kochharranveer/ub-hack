@@ -226,6 +226,8 @@ try {
   const guidedDraft=await api("/care/api/plans/import",{requestId:"guided-plan-import",sourceText:"Medicine: Atorvastatin 10 mg, 1 tablet at 8 PM. Synthetic example.\nExercise: demonstration elbow movement.\nSchedule a follow-up request."});
   const guidedPlan=await api("/care/api/plans/"+guidedDraft.id+"/approve",{requestId:"guided-plan-approve",expectedCurrentVersion:2});
   let guided=await api("/api/voice/checkin/start",{requestId:"guided-start"});
+  assert.equal(guided.checkin.stage,"greeting");
+  guided=await api("/api/voice/checkin/answer",{requestId:"guided-wellbeing",checkinId:guided.checkin.id,expectedStage:guided.checkin.stage,text:"My elbow feels okay today."});
   assert.equal(guided.checkin.stage,"medications");
   guided=await api("/api/voice/checkin/answer",{requestId:"guided-med",checkinId:guided.checkin.id,expectedStage:guided.checkin.stage,text:"Yes"});
   assert.ok(guided.proposalId);
@@ -236,7 +238,7 @@ try {
   assert.equal(guided.checkin.stage,"food");checks++;
   guided=await api("/api/voice/checkin/answer",{requestId:"guided-food",checkinId:guided.checkin.id,expectedStage:guided.checkin.stage,text:"Oatmeal and a banana"});
   assert.equal(guided.checkin.stage,"readiness");
-  assert.match(guided.message,/availability is pending/);checks++;
+  assert.doesNotMatch(guided.message,/appointment confirmed/i);checks++;
   guided=await api("/api/voice/checkin/answer",{requestId:"guided-ready",checkinId:guided.checkin.id,expectedStage:guided.checkin.stage,text:"Yes"});
   assert.equal(guided.checkin.stage,"exercise");checks++;
   const guidedSession=await api("/rehab/api/sessions",{requestId:"guided-session",planId:guidedPlan.id,planVersion:guidedPlan.version,exerciseId:"demo-elbow"});

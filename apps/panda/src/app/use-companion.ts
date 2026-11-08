@@ -46,7 +46,7 @@ export function useCompanion() {
   const [checkin, setCheckin] = useState<VoiceReply["checkin"]>();
   const checkinRef=useRef<VoiceReply["checkin"]>(undefined);
   const startAttempt=useRef<{requestId:string}|null>(null);
-  const continueAttempt=useRef<{requestId:string;checkinId:string;proposalId:string}|null>(null);
+  const continueAttempt=useRef<{requestId:string;checkinId:string;proposalId:string;confirmationText?:string}|null>(null);
   const handsfree=useRef(false);
   const feedbackQueue=useRef<{requestId:string;checkinId:string;event:RehabBridgeEvent}[]>([]);
   const flushingFeedback=useRef(false);
@@ -109,6 +109,7 @@ export function useCompanion() {
   async function loadContext() {
     const c = await request<VoiceContext>("context");
     if (live.current) setContext(c);
+    return c;
   }
   async function refresh() {
     setRefreshing(true); setError("");
@@ -129,7 +130,7 @@ export function useCompanion() {
       const results = await Promise.allSettled([
         loadContext(),
         request<VoiceHistoryTurn[]>("voice/history"),
-        request<{checkin:CheckinSession|null}>("voice/memory"),
+        request<{checkin:CheckinSession|null;transcript?:{role:string;text:string}[]}>("voice/memory"),
       ]);
       if (!live.current || initGeneration !== generation.current) return;
       const past = results[1];
@@ -139,8 +140,10 @@ export function useCompanion() {
         if (last) acceptReply(last);
       }
       const remembered=results[2];
-      if (remembered.status==="fulfilled" && remembered.value.checkin && remembered.value.checkin.stage!=="complete") {
+      if (remembered.status==="fulfilled" && remembered.value.checkin) {
         checkinRef.current={id:remembered.value.checkin.id,stage:remembered.value.checkin.stage};setCheckin(checkinRef.current);
+        const last=remembered.value.transcript?.filter(turn=>turn.role==="assistant").at(-1),loaded=results[0];
+        if(last&&loaded.status==="fulfilled")acceptReply({mode:loaded.value.mode,engine:loaded.value.aiEngine,message:last.text,checkin:checkinRef.current,proposalId:remembered.value.checkin.pendingProposalId});
       }
       const failed = results.find(r => r.status === "rejected" && r.reason?.name !== "AbortError");
       if (failed?.status === "rejected") setError(failed.reason.message);
@@ -170,7 +173,7 @@ export function useCompanion() {
     inFlight.current = true;
     const run = ++generation.current;
     setPhase("thinking"); setError(""); setNotice("");
-    const activeCheckin=!direct && checkinRef.current && checkinRef.current.stage!=="complete" ? checkinRef.current : undefined;
+    const activeCheckin=!direct ? checkinRef.current : undefined;
     const route=activeCheckin ? "voice/checkin/answer" : "voice/turn";
     if (pending.current?.text !== value || pending.current.route!==route) pending.current = { requestId: crypto.randomUUID(), text: value, route, ...(activeCheckin ? {checkinId:activeCheckin.id,expectedStage:activeCheckin.stage} : {}) };
     const input = pending.current;
@@ -194,7 +197,7 @@ export function useCompanion() {
       if (run === generation.current) {inFlight.current = false;if (feedbackQueue.current.length) void flushFeedback();}
     }
   }
-  async function resolveProposal(action: "confirm" | "cancel") {
+  async function resolveProposal(action: "confirm" | "cancel",confirmationText?:string) {
     const proposalId = latestReply.current?.proposalId;
     if (!proposalId || inFlight.current) return;
     stopMic(); stopSound();
@@ -205,7 +208,7 @@ export function useCompanion() {
       let result = await request<VoiceReply>("voice/" + action, { proposalId });
       const current=checkinRef.current;
       if (current && ["medication_confirmation","help_confirmation"].includes(current.stage)) {
-        if (continueAttempt.current?.proposalId!==proposalId) continueAttempt.current={requestId:crypto.randomUUID(),checkinId:current.id,proposalId};
+        if (continueAttempt.current?.proposalId!==proposalId) continueAttempt.current={requestId:crypto.randomUUID(),checkinId:current.id,proposalId,...(confirmationText?{confirmationText}:{})};
         result=await request<VoiceReply>("voice/checkin/continue",continueAttempt.current);
         continueAttempt.current=null;
       }
@@ -251,13 +254,9 @@ export function useCompanion() {
       setText(transcript);
       if (handsfree.current && spokenProposal) {
         if (spokenProposal!==latestReply.current?.proposalId) return;
-        const choice=spokenConfirmation(transcript);
-        if(choice){setText("");void resolveProposal(choice);}
-        else {
-          stopMic();
-          acceptReply({...latestReply.current!,message:"Please say confirm or cancel for this action.\n"+latestReply.current!.message.replace(/^Please say confirm or cancel for this action\.\n/,"")});
-          void speak();
-        }
+        const choice=spokenConfirmation(transcript,latestReply.current?.confirmationPrompt!==false);
+        if(choice){setText("");void resolveProposal(choice,transcript);}
+        else void send(transcript);
       }
       else if (handsfree.current) void send(transcript);
       else setNotice("Transcript ready. Review it, then choose Send.");
@@ -285,8 +284,7 @@ export function useCompanion() {
     catch { recognition.current = null; setError("Could not start the microphone. Type your message below."); setPhase(settledPhase()); }
   }
   async function speak(browserFallback = false) {
-    const replyMessage = latestReply.current?.message;
-    const message = replyMessage && (replyMessage+(latestReply.current?.proposalId?"\nSay confirm or cancel.":""));
+    const message = latestReply.current?.speechText||latestReply.current?.message;
     if (!message || inFlight.current) return;
     stopMic(); stopSound(); setError(""); setNotice("");
     const token = soundGeneration.current;
@@ -356,6 +354,7 @@ export function useCompanion() {
         if (!live.current) break;
         // Camera/tracking updates must not interrupt a patient mid-sentence.
         if (item.event.type==="report_saved") {
+          if(result.checkin&&["help_confirmation","wellbeing_followup"].includes(result.checkin.stage))continue;
           stopMic();stopSound();acceptReply(result);
           if (handsfree.current) void speak();
         } else if (result.checkin) {checkinRef.current=result.checkin;setCheckin(result.checkin);}
@@ -369,7 +368,7 @@ export function useCompanion() {
     feedbackQueue.current.push({requestId:crypto.randomUUID(),checkinId:current.id,event});
     void flushFeedback();
   }
-  async function rememberedContext() {return request<{patientId:string;retention:string;totalEvents:number;events:{id:string;kind:string;quote:string;at:string;source:string}[]}>("voice/memory");}
+  async function rememberedContext() {return request<{patientId:string;retention:string;totalEvents:number;events:{id:string;kind:string;quote:string;at:string;source:string}[];transcript?:{id:string;role:"user"|"assistant";text:string;at:string}[]}>("voice/memory");}
 
 
   async function activateVoice() {

@@ -20,3 +20,5 @@
 Paid Gemini/ElevenLabs calls were tested using synthetic data. No emergency notifications, real clinician delivery, clinical correctness, HIPAA compliance or app-store release were validated by this starter. No camera-derived progress is fabricated. Use synthetic data only until the appropriate access and deployment work is complete.
 
 Persistent patient context and guided check-in/exercise callbacks are implemented. Doctor availability/booking and medical-reference retrieval remain pending. See [VOICE_CHECKIN.md](VOICE_CHECKIN.md).
+
+The companion now uses model-generated multi-turn dialogue with a server-validated agenda, patient-first opening, concise routine medication speech, and a complete scoped transcript. See [CONVERSATION_DESIGN.md](CONVERSATION_DESIGN.md). This is not validated general medical advice or a realtime full-duplex voice agent.

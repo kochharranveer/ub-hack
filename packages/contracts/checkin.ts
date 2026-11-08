@@ -5,10 +5,11 @@ const requestId = z.string().min(8).max(100);
 export const StartCheckinSchema = z.object({ requestId }).strict();
 export const AnswerCheckinSchema = z.object({
   requestId, checkinId: z.string().uuid(), text: z.string().min(1).max(2000).refine(s => Boolean(s.trim())),
-  expectedStage: z.enum(["medications","medication_confirmation","food","readiness","exercise","exercise_review","pain_check","help_confirmation","complete"]).optional(),
+  expectedStage: z.enum(["greeting","wellbeing_followup","medications","medication_confirmation","food","readiness","exercise","exercise_review","pain_check","help_confirmation","complete"]).optional(),
 }).strict();
 export const ContinueCheckinSchema = z.object({
   requestId, checkinId: z.string().uuid(), proposalId: z.string().uuid(),
+  confirmationText: z.string().min(1).max(2000).optional(),
 }).strict();
 export const RehabBridgeEventSchema = z.discriminatedUnion("type", [
   z.object({ version: z.literal("1.0.0"), type: z.literal("session_started"), sessionId: z.string().min(1), planId: z.string(), planVersion: z.number().int().positive() }).strict(),
@@ -18,7 +19,8 @@ export const RehabBridgeEventSchema = z.discriminatedUnion("type", [
 ]);
 export type RehabBridgeEvent = z.infer<typeof RehabBridgeEventSchema>;
 export const ExerciseFeedbackSchema = z.object({ requestId, checkinId: z.string().uuid(), event: RehabBridgeEventSchema }).strict();
-export type MemoryKind = "medication_report" | "food" | "scheduling_pending" | "exercise_readiness" | "exercise_feedback" | "exercise_report" | "exercise_review" | "pain_review";
+export type MemoryKind = "wellbeing" | "medication_context" | "medication_report" | "food" | "scheduling_pending" | "exercise_readiness" | "exercise_feedback" | "exercise_report" | "exercise_review" | "pain_review";
+export type ConversationTurn = {id:string;checkinId:string;role:"user"|"assistant";text:string;at:string};
 export type PatientMemoryEvent = {
   id: string; patientId: string; kind: MemoryKind; quote: string; at: string;
   source: "patient_report" | "rehab_report" | "client_observation" | "system";
@@ -29,4 +31,7 @@ export type CheckinSession = {
   stage: CheckinStage; medicationTaskIds: string[]; medicationIndex: number;
   pendingProposalId?: string; exerciseSessionId?: string; startedAt: string; updatedAt: string;
   painReported?: boolean;
+  foodKnown?: boolean;
+  concernPending?: boolean;
+  medicationDetailsRequired?: string[];
 };

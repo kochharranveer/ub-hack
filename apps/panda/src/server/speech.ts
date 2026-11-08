@@ -18,7 +18,7 @@ export async function synthesize(raw: unknown, signal?: AbortSignal) {
     const response = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" + encodeURIComponent(voice) + "?output_format=mp3_44100_128", {
       method: "POST",
       headers: { "xi-api-key": key, "Content-Type": "application/json" },
-      body: JSON.stringify({ text, model_id: model }),
+      body: JSON.stringify({ text, model_id: model, voice_settings: /eleven_v[34]/.test(model) ? {stability:0.5} : {stability:0.4,similarity_boost:0.75,style:0,speed:1} }),
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
     });
     if (!response.ok || !response.headers.get("content-type")?.toLowerCase().startsWith("audio/"))

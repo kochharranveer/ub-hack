@@ -15,3 +15,5 @@ Ranveer implementation update (November 7, 2026): AI-assisted voice UI, SQLite r
 Synthetic-data update: 12 fictional patient records were generated for UI/testing, with one active default identity (Alex). Medication examples and schedules are synthetic sample data, not patient-specific advice. No existing clinical store was overwritten.
 
 Expanded request: patient memory, deterministic guided check-ins, typed exercise callbacks, owner report verification, inline voice/text controls and recorded STT fallback were implemented with AI assistance. No August/medical-reference retrieval or clinically validated free-form advice is connected.
+
+Conversation redesign: AI-assisted contextual dialogue generation, allowed conversational moves, durable full transcripts, concise routine medication speech, pending-action interruptions and exercise pause signaling were added. Shared clinical/report mutation contracts remain unchanged. Live model checks used fresh synthetic stores; real voice-quality acceptance is pending human listening.

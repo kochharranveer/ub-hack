@@ -10,9 +10,10 @@ import { careService } from "../apps/care/src/server/service";
 import { rehabService } from "../apps/rehab/src/server/service";
 import { demoCommand } from "../apps/panda/src/server/provider";
 import { fixtureCare } from "../packages/contracts/fixtures";
+import {dialogueTurn,medicationLanguage,type DialogueModel} from "../apps/panda/src/server/conversation";
 import type { VoiceReply } from "../packages/contracts/voice";
 
-async function setup(t:test.TestContext) {
+async function setup(t:test.TestContext,model?:DialogueModel) {
   const dir=await mkdtemp(path.join(tmpdir(),"panda-checkin-"));
   t.after(()=>rm(dir,{recursive:true,force:true}));
   const care=careService(path.join(dir,"care.json")),rehab=rehabService(path.join(dir,"rehab.json"));
@@ -22,10 +23,11 @@ async function setup(t:test.TestContext) {
     mode:"connected",snapshot:()=>care.snapshot(),
     write:async(route,body)=>{writes++;return route==="help" ? care.help(body) : care.confirm(route.split("/")[1],body);},
   },async(text,c,_signal,remembered)=>{seenContext=remembered||"";return {command:demoCommand(text,c),engine:"demo_rules"};},undefined,()=>clock,memory);
-  const checkin=checkinService(memory,voice,{snapshot:()=>care.snapshot(),exerciseSession:id=>rehab.session(id),mode:"connected"},()=>clock);
+  const checkin=checkinService(memory,voice,{snapshot:()=>care.snapshot(),exerciseSession:id=>rehab.session(id),mode:"connected"},()=>clock,model);
   let counter=0;
   const id=()=> "checkin-request-"+(++counter);
-  const start=()=>checkin.start({requestId:id()});
+  const greet=()=>checkin.start({requestId:id()});
+  const start=async()=>{const r=await greet();return r.checkin?.stage==="greeting"?answer(r,"My elbow feels okay today."):r;};
   const answer=(reply:VoiceReply,text:string)=>checkin.answer({requestId:id(),checkinId:reply.checkin!.id,expectedStage:reply.checkin!.stage,text});
   const confirm=async(reply:VoiceReply)=>{
     await voice.confirm({proposalId:reply.proposalId});
@@ -44,7 +46,7 @@ async function setup(t:test.TestContext) {
     const feedback={requestId:id(),checkinId:r.checkin!.id,event:{version:"1.0.0",type:"report_saved",sessionId:session.id}};
     return {reply:await checkin.exerciseFeedback(feedback),session,feedback};
   };
-  return {care,rehab,memory,voice,checkin,start,answer,confirm,ready,exercise,id,writes:()=>writes,seenContext:()=>seenContext,setClock:(value:number)=>{clock=value;}};
+  return {care,rehab,memory,voice,checkin,start,greet,answer,confirm,ready,exercise,id,writes:()=>writes,seenContext:()=>seenContext,setClock:(value:number)=>{clock=value;}};
 }
 test("guided check-in requires medication confirmation, remembers food, and leaves scheduling pending",async t=>{
   const x=await setup(t);
@@ -56,7 +58,7 @@ test("guided check-in requires medication confirmation, remembers food, and leav
   r=await x.confirm(r);
   assert.equal(r.checkin?.stage,"food");assert.equal(x.writes(),1);
   r=await x.answer(r,"I ate oatmeal, eggs, and a banana.");
-  assert.equal(r.checkin?.stage,"readiness");assert.match(r.message,/availability is pending/);
+  assert.equal(r.checkin?.stage,"readiness");assert.doesNotMatch(r.message,/booked|appointment confirmed/i);
   const remembered=await x.checkin.memory();
   assert.ok(remembered.events.some(e=>e.kind==="food" && e.quote==="I ate oatmeal, eggs, and a banana."));
   assert.ok(remembered.events.some(e=>e.kind==="scheduling_pending" && e.metadata.booked===false));
@@ -99,11 +101,11 @@ test("resuming an expired check-in confirmation returns to its question without 
 test("pain reports preserve the patient's exact words and never contact Care before confirmation",async t=>{
   const x=await setup(t);let r=(await x.exercise(await x.ready())).reply;
   r=await x.answer(r,"It felt uncomfortable.");r=await x.answer(r,"Yes");
-  assert.equal(r.checkin?.stage,"pain_check");assert.match(r.message,/describe/);
+  assert.equal(r.checkin?.stage,"pain_check");assert.match(r.message,/tell me|describe/);
   const quote="My left elbow hurts.  I stopped.";
   r=await x.answer(r,quote);
   assert.equal(r.checkin?.stage,"help_confirmation");assert.equal((await x.care.snapshot()).help.length,0);
-  r=await x.confirm(r);assert.equal(r.checkin?.stage,"complete");
+  r=await x.confirm(r);assert.equal(r.checkin?.stage,"wellbeing_followup");
   const help=(await x.care.snapshot()).help;
   assert.equal(help.length,1);assert.equal(help[0].quote,quote);assert.equal(help[0].status,"open");
 });
@@ -188,4 +190,93 @@ test("older food context remains retrievable after newer exercise feedback fills
   });
   const reply=await x.voice.turn({requestId:x.id(),text:"What food did I eat?"});
   assert.match(reply.message,/Older lentil soup/);
+});
+
+
+test("conversation opens with wellbeing and routine speech omits strength and clock time",async t=>{
+  const x=await setup(t);let r=await x.greet();
+  assert.equal(r.checkin?.stage,"greeting");assert.match(r.message,/elbow.*feeling/i);assert.doesNotMatch(r.message,/atorvastatin|medication|food/i);
+  r=await x.answer(r,"I'm doing okay today.");
+  assert.equal(r.checkin?.stage,"medications");assert.match(r.message,/evening.*atorvastatin/i);assert.doesNotMatch(r.message,/10 mg|8:00|tablet/);
+  r=await x.answer(r,"Yes, I took it.");
+  assert.match(r.message,/10 mg/);assert.doesNotMatch(r.speechText!,/10 mg|8:00|tablet/);assert.equal(x.writes(),0);
+});
+test("filler-led patient questions stay questions and never become food reports",async t=>{
+  const x=await setup(t);let r=await x.answer(await x.start(),"No");assert.equal(r.checkin?.stage,"food");
+  r=await x.answer(r,"Uh, so tell me this, do you know my disease or what I got done?");
+  assert.equal(r.checkin?.stage,"food");assert.match(r.message,/isn't recorded|don't have a diagnosis/i);assert.doesNotMatch(r.message,/10 mg|8:00/);
+  assert.equal((await x.checkin.memory()).events.filter(e=>e.kind==="food").length,0);
+});
+test("worsening pain interrupts any checklist step and offers an exact-quote request without writing",async t=>{
+  const x=await setup(t);let r=await x.answer(await x.start(),"No");
+  const quote="My elbow is hurting more and more. The pain is increasing and throbbing.";
+  r=await x.answer(r,quote);assert.equal(r.checkin?.stage,"help_confirmation");assert.ok(r.proposalId);assert.equal(x.writes(),0);
+  assert.match(r.speechText!,/getting worse|pause|care team/i);assert.doesNotMatch(r.speechText!,/meal|sandwich|ready to exercise/);
+  assert.equal((await x.checkin.memory()).events.filter(e=>e.kind==="food").length,0);
+  r=await x.confirm(r);assert.equal(r.checkin?.stage,"wellbeing_followup");assert.equal((await x.care.snapshot()).help[0].quote,quote);
+  r=await x.answer(r,"Yes, let's exercise");assert.notEqual(r.navigation,"/rehab");
+});
+test("recent dialogue is sent back on every model turn and the complete transcript survives reopening",async t=>{
+  const calls:Parameters<DialogueModel>[0][]=[];
+  const x=await setup(t,async(input)=>{calls.push(structuredClone(input));return dialogueTurn(input);});
+  let r=await x.greet();const greeting=r.message;r=await x.answer(r,"My elbow feels okay today.");r=await x.answer(r,"No, not yet.");
+  assert.ok(calls.at(-1)!.history.some(turn=>turn.text===greeting));assert.ok(calls.at(-1)!.history.some(turn=>turn.text==="My elbow feels okay today."));
+  const saved=await new PatientMemoryRepository(x.memory.file).snapshot("pat-demo-001");
+  assert.deepEqual(saved.transcript.map(t=>t.role),["assistant","user","assistant","user","assistant"]);
+  assert.equal(saved.transcript[1].text,"My elbow feels okay today.");
+  await x.checkin.forget({confirm:true});assert.deepEqual((await x.checkin.memory()).transcript,[]);
+});
+test("a changed prescription keeps exact details while a dose question gets a precise answer",async t=>{
+  const x=await setup(t);let r=await x.start();r=await x.answer(r,"What dose am I supposed to take?");
+  assert.match(r.message,/10 mg/);assert.match(r.message,/8:00 PM/);
+  const draft=await x.care.importPlan({requestId:x.id(),sourceText:"Atorvastatin 20 mg · 1 tablet · 8:00 PM"});await x.care.approve(draft.id,{requestId:x.id(),expectedCurrentVersion:1});
+  r=await x.start();assert.match(r.message,/20 mg/);
+  assert.ok((await x.checkin.memory()).checkin?.medicationDetailsRequired?.length);
+});
+test("already completed medicine and reported meals are not asked again on a new conversation",async t=>{
+  const x=await setup(t);let r=await x.confirm(await x.answer(await x.start(),"Yes"));r=await x.answer(r,"Oatmeal and fruit");r=await x.answer(r,"No");
+  r=await x.greet();assert.equal(r.checkin?.stage,"greeting");r=await x.answer(r,"I feel okay.");assert.equal(r.checkin?.stage,"readiness");
+});
+test("multiple strengths of the same medicine retain disambiguating details",()=>{
+  const care=fixtureCare();const first=care.tasks[0];const second={...first,id:"other-dose",title:"Atorvastatin 20 mg · 1 tablet · 8:00 PM"};
+  assert.equal(medicationLanguage(first,[first,second]).precise,true);assert.match(medicationLanguage(first,[first,second]).spoken,/10 mg/);
+});
+
+test("a patient can ask a question while an action is pending without yes becoming implicit confirmation",async t=>{
+  const x=await setup(t);let r=await x.answer(await x.start(),"Yes");const proposalId=r.proposalId;
+  r=await x.answer(r,"What dose is in my plan?");
+  assert.equal(r.proposalId,proposalId);assert.equal(r.confirmationPrompt,false);assert.match(r.speechText!,/10 mg/);assert.equal(x.writes(),0);
+});
+test("declining exercise leaves ongoing questions available and an explicit later start can open it",async t=>{
+  const x=await setup(t);let r=await x.answer(await x.start(),"No");r=await x.answer(r,"Soup");r=await x.answer(r,"No, not yet");
+  assert.equal(r.checkin?.stage,"complete");r=await x.answer(r,"Do you know what operation I had?");assert.equal(r.checkin?.stage,"complete");
+  r=await x.answer(r,"I'm ready to do exercise");assert.equal(r.navigation,"/rehab");
+});
+test("cancelled dialogue rolls back unsaved conversation state and transcript",async t=>{
+  const controller=new AbortController();
+  const x=await setup(t,async(_input,signal)=>{controller.abort();assert.equal(signal?.aborted,true);throw new DOMException("Stopped","AbortError");});
+  await assert.rejects(()=>x.checkin.start({requestId:x.id()},controller.signal));
+  const snapshot=await x.checkin.memory();assert.equal(snapshot.checkin,null);assert.equal(snapshot.transcript.length,0);assert.equal(snapshot.totalEvents,0);
+});
+
+test("conversational context retains older meal reports even after noisy exercise callbacks",async t=>{
+  const calls:Parameters<DialogueModel>[0][]=[];const x=await setup(t,async input=>{calls.push(structuredClone(input));return dialogueTurn(input);});
+  await x.memory.transaction("pat-demo-001",tx=>{
+    tx.append({id:"meal-before-feedback",patientId:"pat-demo-001",kind:"food",quote:"Lentils before exercise",at:"2020-01-01T00:00:00.000Z",source:"patient_report",metadata:{}});
+    for(let i=0;i<60;i++)tx.append({id:"camera-noise-"+i,patientId:"pat-demo-001",kind:"exercise_feedback",quote:"Preview updated",at:"2026-11-07T10:00:00.000Z",source:"client_observation",metadata:{}});
+  });await x.greet();assert.ok(calls.at(-1)!.memory.some(e=>e.quote==="Lentils before exercise"));
+});
+
+test("a concern pauses the exercise view and a late owner report cannot replace the concern",async t=>{
+  const x=await setup(t);let r=await x.ready();const care=await x.care.snapshot();
+  const session=await x.rehab.start({requestId:x.id(),planId:care.plan!.id,planVersion:care.plan!.version,exerciseId:"demo-elbow"},care);
+  const before=(await x.checkin.memory()).transcript.length;
+  await x.checkin.exerciseFeedback({requestId:x.id(),checkinId:r.checkin!.id,event:{version:"1.0.0",type:"session_started",sessionId:session.id,planId:session.planId,planVersion:session.planVersion}});
+  assert.equal((await x.checkin.memory()).transcript.length,before);
+  r=await x.answer(r,"My elbow pain is getting worse.");assert.equal(r.pauseExercise,true);const proposalId=r.proposalId;
+  const report={sessionId:session.id,patientId:session.patientId,planId:session.planId,planVersion:session.planVersion,exerciseId:session.exerciseId,startedAt:session.startedAt,endedAt:new Date().toISOString(),repetitions:0,rangeDegrees:null,trackingQuality:"unavailable",evidence:"camera_estimated",terminationReason:"patient_stopped"};
+  await x.rehab.finish(session.id,{requestId:x.id(),report});
+  const late=await x.checkin.exerciseFeedback({requestId:x.id(),checkinId:r.checkin!.id,event:{version:"1.0.0",type:"report_saved",sessionId:session.id}});
+  assert.equal(late.checkin?.stage,"help_confirmation");assert.equal(late.proposalId,proposalId);
+  assert.ok((await x.checkin.memory()).events.some(e=>e.kind==="exercise_report"));assert.equal(x.writes(),0);
 });

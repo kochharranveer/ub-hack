@@ -2,7 +2,7 @@
 
 Synthetic MVP verification; this is not clinical-product acceptance.
 
-- `npm run check`: TypeScript across three apps and **67 tests, zero failures**. Includes medication confirmation, food/context persistence, patient separation, recovery, stale-step protection, owner-verified exercise feedback, post-exercise review, pain proposals and transcription boundaries. Additional checks cover clear/ambiguous spoken confirmations, automatic next-turn audio callbacks, cancellation during decoding and playback cleanup.
+- `npm run check`: TypeScript across three apps and **85 tests, zero failures**. Includes medication confirmation, food/context persistence, patient separation, recovery, stale-step protection, owner-verified exercise feedback, post-exercise review, pain proposals and transcription boundaries. Additional checks cover clear/ambiguous spoken confirmations, automatic next-turn audio callbacks, cancellation during decoding and playback cleanup.
 - `npm run build`: all three apps passed; Panda rebuilt after the final inline UI and expired-confirmation recovery change.
 - `npm run test:integration`: **27 connected checks plus three standalone fixture checks passed**. Exercises the gateway, source/revision/idempotency rules and full check-in → report → review → permanent-memory flow.
 - Browser: keyboard replaces Panda inline; bottom button becomes microphone; switching back restores Panda without a dialog. The synthetic medication → food → readiness → embedded exercise → simulated report → feelings → pain review completed at the same URL. Desktop text mode had no document overflow. Earlier compact-home QA covered 390×844, 320×568, 844×390 and 1366×768; the final keyboard layout has not been verified on a physical phone.
@@ -28,3 +28,7 @@ Still pending: doctor availability/booking, real pose inference, actual micropho
 See [check-in integration](docs/VOICE_CHECKIN.md) and [handoff](docs/RANVEER_HANDOFF.md).
 
 Speech recognition fix: configured server transcription bypasses exposed native recognizers. Four regression checks verify selection, capture-to-transcription delivery, aborting delayed transcription and recorder-failure cleanup. Capture metering uses the already-unlocked conversation audio context.
+
+Conversation redesign: warm wellbeing opening, genuine multi-turn generation, precise-versus-routine medication speech, interruptions, concern-first behavior, full transcript, cancellation and pending-action conversation are covered by regression tests. All three apps were rebuilt. Live synthetic multi-turn model/TTS verification and actual device checks are distinguished in the delivery notes.
+
+Final browser QA with the updated Gemini configuration verified the wellbeing greeting, concise evening-atorvastatin question, and expandable chronological transcript. The full synthetic eight-response scenario passed at a paced rate; after the key update, seven rapid generated responses passed before an HTTP429 burst limit. A minimal updated-key request and the final browser turns also passed. Transient provider unavailability and quota failures stay explicit; successful mock tests are not substituted for live model acceptance. Actual microphone capture, barge-in and human voice-quality acceptance remain separate.

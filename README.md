@@ -1,5 +1,7 @@
 # Panda Care — three-app team starter, v0.2
 
+Latest conversation redesign: see [how Panda now converses](docs/CONVERSATION_DESIGN.md).
+
 Latest Ranveer implementation: see [the voice handoff and remaining checklist](docs/RANVEER_HANDOFF.md) and [actual validation](VALIDATION.md).
 
 One phone/browser product, three independently runnable web apps. Responsibilities are split by complete product functions. This revision supersedes the previous single-app starter and contract v1.
