@@ -235,3 +235,42 @@ textarea:focus-visible {
     letter-spacing: -1px;
   }
 }
+
+/* The clinician workspace borrows the patient app's calm glass-and-sage palette. */
+body.care-doctor-theme {
+  color: #f4f3ed;
+  background: linear-gradient(145deg, #64777a 0%, #68777a 46%, #a2917c 100%) fixed;
+}
+body.care-doctor-theme > header {
+  color: #f4f3ed;
+  background: rgb(69 87 91 / 25%);
+  border-bottom-color: rgb(245 244 237 / 16%);
+  backdrop-filter: blur(18px);
+}
+body.care-doctor-theme > header .brand,
+body.care-doctor-theme > header .brand span,
+body.care-doctor-theme > header nav a,
+body.care-doctor-theme > header small {
+  color: #f4f3ed;
+}
+body.care-doctor-theme > .notice,
+body.care-doctor-theme > footer {
+  display: none;
+}
+body.care-doctor-theme > main {
+  max-width: none;
+  padding: 34px clamp(18px, 5vw, 76px) 70px;
+}
+body.care-doctor-theme a {
+  color: #f4f3ed;
+}
+body.care-doctor-theme input,
+body.care-doctor-theme select,
+body.care-doctor-theme textarea {
+  color: #f4f3ed;
+  background: rgb(255 255 255 / 8%);
+  border-color: rgb(245 244 237 / 28%);
+}
+body.care-doctor-theme input::placeholder {
+  color: rgb(245 244 237 / 55%);
+}

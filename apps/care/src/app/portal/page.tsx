@@ -54,6 +54,11 @@ export default function ClinicianPortal() {
   const [addingAppointment, setAddingAppointment] = useState(false);
   const [appointmentDraft, setAppointmentDraft] = useState({ date: dateKey(new Date()), time: "", clinician: "", purpose: "" });
 
+  useEffect(() => {
+    document.body.classList.add("care-doctor-theme");
+    return () => document.body.classList.remove("care-doctor-theme");
+  }, []);
+
   async function loadPatients() {
     setError("");
     const index = await api<{ patients: PatientRow[] }>("patients");
