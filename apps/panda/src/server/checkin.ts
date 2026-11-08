@@ -88,7 +88,7 @@ export function checkinService(
     return {...base,engine:d.engine,checkin:{id:s.id,stage:s.stage},...(base.proposalId?{speechText:response,confirmationPrompt:["respond","med_yes","care_request","care_concern","pain_report"].includes(d.move)}:{message:response})};
   }
   function reports(tx:MemoryTransaction) {
-    const topics:MemoryKind[]=["wellbeing","food","medication_report","pain_review","exercise_report","exercise_review","exercise_readiness"];
+    const topics:MemoryKind[]=["wellbeing","food","medication_report","pain_review","exercise_report","exercise_review","exercise_readiness","exercise_feedback"];
     const values=[...topics.flatMap(kind=>tx.events(kind,2)),...tx.events(undefined,10)];
     return [...new Map(values.map(value=>[value.id,value])).values()];
   }
@@ -315,10 +315,10 @@ export function checkinService(
             return say(tx,s,current,v.requestId,question(s,current),"The owner saved the "+guided.configuration.label+" report. "+(report.terminationReason==="discomfort_reported"?"They chose to stop for discomfort. Keep exercise on hold and ask what they felt. ":"")+"Its evidence is "+report.evidence+" and the targets are synthetic demonstration references, not a prescription or clinical validation. Acknowledge the actual evidence briefly, then ask how the exercise felt. Never call patient-reported holds camera verified.",undefined,signal);
           }
           if(cue){
-            if(cue.sessionId!==guided.id||cue.sessionControlRevision!==guided.sessionControlRevision||guided.status!=="running"||cue.expiresAtUtc&&Date.parse(cue.expiresAtUtc)<=now())return question(s,current);
+            if(cue.generationStatus!=="complete"||cue.sessionId!==guided.id||cue.sessionControlRevision!==guided.sessionControlRevision||guided.status!=="running"||cue.expiresAtUtc&&Date.parse(cue.expiresAtUtc)<=now())return question(s,current);
             const seen=tx.events("exercise_feedback",200).some(e=>e.metadata.feedbackId===cue.eventId);
             if(seen)return question(s,current);
-            event(tx,s,"guided-cue:"+cue.eventId,"exercise_feedback",cue.text,"rehab_report",{sessionId:guided.id,feedbackId:cue.eventId,code:cue.feedbackCode,evidence:cue.evidence,sourceRoute:"/rehab/api/cv/v1/sessions/"+guided.id+"/feedback/"+cue.eventId});
+            event(tx,s,"guided-cue:"+cue.eventId,"exercise_feedback",cue.text,"rehab_report",{sessionId:guided.id,feedbackId:cue.eventId,code:cue.feedbackCode,evidence:cue.evidence,textSource:cue.textSource,textRevision:cue.textRevision,phraseId:cue.phraseId,fallbackReason:cue.fallbackReason,sourceRoute:"/rehab/api/cv/v1/sessions/"+guided.id+"/feedback/"+cue.eventId});
             return reply(s,cue.text,{exerciseCue:{eventId:cue.eventId,code:cue.feedbackCode,expiresAt:cue.expiresAtUtc}});
           }
           return question(s,current);

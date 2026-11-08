@@ -4,6 +4,7 @@ import { mkdtemp,rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { geminiReadiness,selectPhrase } from "../apps/rehab/src/server/cv/gemini";
 import { cvService } from "../apps/rehab/src/server/cv/service";
 import { contextResponse,requireIdentity,readBody } from "../apps/rehab/src/server/cv/http";
 import type { CvEventCandidate,CvTiming,CvFinishInput } from "../packages/contracts/rehab-cv";
@@ -159,4 +160,17 @@ test("Demo identity cookies persist across reload while CSRF/origin and remote b
 test("Body limits reject oversized or non-JSON input",async()=>{
   await assert.rejects(()=>readBody(new Request("http://localhost",{method:"POST",headers:{"content-type":"text/plain"},body:"{}"})),/JSON request/);
   await assert.rejects(()=>readBody(new Request("http://localhost",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text:"x".repeat(33000)})})),/size limit/);
+});
+
+
+test("connected exercise feedback reuses Panda Gemini privately and respects explicit off",async t=>{
+  const names=["PANDA_INTEGRATION","PANDA_AI_MODE","PANDA_GEMINI_API_KEY","PANDA_GEMINI_MODEL","REHAB_GEMINI_MODE","REHAB_GEMINI_API_KEY","REHAB_GEMINI_MODEL"];
+  const before=names.map(name=>process.env[name]);t.after(()=>names.forEach((name,i)=>{if(before[i]===undefined)delete process.env[name];else process.env[name]=before[i];}));
+  for(const name of names)delete process.env[name];
+  Object.assign(process.env,{PANDA_INTEGRATION:"connected",PANDA_AI_MODE:"gemini",PANDA_GEMINI_API_KEY:"private-shared-key",PANDA_GEMINI_MODEL:"test-model"});
+  assert.deepEqual(geminiReadiness(),{mode:"controlled",configured:true,model:"test-model"});assert.doesNotMatch(JSON.stringify(geminiReadiness()),/private-shared-key/);
+  let calls=0;
+  const fetcher=async(_url:unknown,options?:RequestInit)=>{calls++;assert.equal(new Headers(options?.headers).get("x-goog-api-key"),"private-shared-key");return new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{parts:[{text:'{"phraseId":"gentle"}'}]}}]}));};
+  assert.equal((await selectPhrase("TRACKING_RESTORED",{primary:"Tracking is ready again.",gentle:"Your working leg is visible again."},fetcher as typeof fetch)).source,"gemini_selected_approved_variant");
+  process.env.REHAB_GEMINI_MODE="off";assert.equal((await selectPhrase("TRACKING_RESTORED",{primary:"Tracking is ready again."},fetcher as typeof fetch)).fallbackReason,"disabled");assert.equal(calls,1);
 });

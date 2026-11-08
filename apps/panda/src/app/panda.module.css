@@ -994,3 +994,92 @@
     transition: none;
   }
 }
+/* The embedded exercise scene owns its camera layout; Panda remains a corner companion. */
+.exerciseShell {
+  padding: 0;
+  background: #263e3e;
+  overflow: hidden;
+}
+.cameraPanda {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  color: #fffdf4;
+  filter: drop-shadow(0 3px 15px #152e2f66);
+}
+.cameraPanda > .voiceCircle {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+.cameraPanda > span {
+  font-size: 12px;
+  margin-top: -10px;
+  text-align: center;
+}
+.cameraPanda small {
+  display: block;
+  font-size: 8px;
+  margin-top: 3px;
+  color: #e3ebdbb0;
+}
+.cameraPanda > div {
+  display: flex;
+  gap: 7px;
+  margin-top: 8px;
+}
+.cameraPanda button {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  min-height: 29px;
+  padding: 7px;
+  background: #ffffff16;
+  border: 1px solid #ffffff25;
+  border-radius: 50%;
+  color: #fff;
+  margin: 0;
+}
+.cameraPanda button svg {
+  width: 100%;
+  height: 100%;
+}
+.exerciseComposer {
+  position: relative;
+  width: 100%;
+  margin: 0 0 13px;
+}
+.exerciseComposer textarea {
+  width: 100%;
+  height: 60px;
+  min-height: 60px;
+  max-height: 85px;
+  resize: none;
+  padding: 12px 48px 12px 12px;
+  color: #fff;
+  background: #ffffff15;
+  border: 1px solid #ffffff35;
+  border-radius: 17px;
+  font-size: 12px;
+}
+.exerciseComposer textarea::placeholder {
+  color: #eef3e3a0;
+}
+.exerciseComposer button {
+  position: absolute;
+  right: 9px;
+  bottom: 11px;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  border-radius: 50%;
+  margin: 0;
+  padding: 6px;
+  background: #eef2e3;
+  color: #263f36;
+}
+.exerciseComposer button svg {
+  width: 100%;
+  height: 100%;
+}

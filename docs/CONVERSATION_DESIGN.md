@@ -27,7 +27,7 @@ Demo mode remains deterministic and is labelled `checkin_workflow`; configured p
 ## Additive contract changes
 
 - `VoiceReply.speechText?` contains natural spoken wording when the visible proposal must retain exact action details.
-- `VoiceReply.pauseExercise?` closes the camera workspace for a new discomfort concern while preserving the voice hook. An arriving owner report is retained without replacing the concern or restarting routine questions.
+- `VoiceReply.pauseExercise?` stops and saves the active exercise set for a new discomfort concern while preserving the corner companion and voice hook. An arriving owner report is retained without replacing the concern or restarting routine questions.
 - `VoiceReply.confirmationPrompt?` identifies a direct invitation to confirm the pending action. After an intervening patient question, a bare yes/no cannot confirm it; an explicit “confirm” or the confirmation button remains available.
 - Stages add `greeting`, `wellbeing_followup` and `followup`; optional agenda-version and per-call review flags migrate earlier sessions without deleting reports. `VoiceReply.conversationEnded?` stops automatic listening after an explicit goodbye, without completing unanswered topics. Existing clinical HTTP contract2.0.0 remains unchanged.
 - Check-in continuation accepts optional `confirmationText` to retain the actual spoken response in the transcript.

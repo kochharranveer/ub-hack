@@ -205,3 +205,104 @@ test("guided feedback is fetched from Rehab, deduplicated and cannot cross patie
     .catch((error) => error);
   assert.ok(foreign instanceof Error);
 });
+
+test("Panda waits for finalized Gemini wording and keeps the source in patient context", async (t) => {
+  const names = [
+    "REHAB_GEMINI_MODE",
+    "REHAB_GEMINI_API_KEY",
+    "REHAB_GEMINI_MODEL",
+  ];
+  const previous = names.map((name) => process.env[name]);
+  Object.assign(process.env, {
+    REHAB_GEMINI_MODE: "controlled",
+    REHAB_GEMINI_API_KEY: "test-private",
+    REHAB_GEMINI_MODEL: "test-model",
+  });
+  t.after(() =>
+    names.forEach((name, i) => {
+      if (previous[i] === undefined) delete process.env[name];
+      else process.env[name] = previous[i];
+    }),
+  );
+  const x = await setup(t);
+  const session = await x.cv.start(x.owner, {
+    requestId: randomUUID(),
+    exerciseId: "seated-knee-extension",
+    side: "left",
+    startedAtUtc: new Date().toISOString(),
+    evidence: "simulated",
+  });
+  await x.feedback({
+    version: "1.0.0",
+    type: "guided_session_started",
+    sessionId: session.id,
+  });
+  const update = await x.cv.events(x.owner, session.id, {
+    requestId: randomUUID(),
+    event: {
+      eventId: randomUUID(),
+      sequence: 1,
+      observedOffsetMs: 6000,
+      type: "attempt_finalized",
+      attemptId: randomUUID(),
+      movementComplete: true,
+      qualifying: true,
+      holdMs: 5000,
+      targetReached: true,
+      rangeDegrees: 70,
+    },
+  });
+  const cue = update.feedback[0];
+  assert.equal(cue.generationStatus, "pending");
+  const early = await x.feedback({
+    version: "1.0.0",
+    type: "guided_feedback",
+    sessionId: session.id,
+    feedbackId: cue.eventId,
+  });
+  assert.equal(early.exerciseCue, undefined);
+  assert.equal(
+    (await x.chat.memory()).events.filter((e) => e.kind === "exercise_feedback")
+      .length,
+    0,
+  );
+  const fetcher = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        candidates: [
+          {
+            finishReason: "STOP",
+            content: {
+              parts: [{ text: JSON.stringify({ phraseId: "gentle" }) }],
+            },
+          },
+        ],
+      }),
+      { headers: { "Content-Type": "application/json" } },
+    );
+  try {
+    const final = await x.cv.generate(x.owner, session.id, cue.eventId, {
+      requestId: randomUUID(),
+    });
+    assert.equal(final.textSource, "gemini_selected_approved_variant");
+    const spoken = await x.feedback({
+      version: "1.0.0",
+      type: "guided_feedback",
+      sessionId: session.id,
+      feedbackId: cue.eventId,
+    });
+    assert.equal(spoken.message, final.text);
+    assert.ok(spoken.exerciseCue);
+    const remembered = (await x.chat.memory()).events.find(
+      (e) => e.kind === "exercise_feedback",
+    );
+    assert.equal(remembered?.quote, final.text);
+    assert.equal(
+      remembered?.metadata.textSource,
+      "gemini_selected_approved_variant",
+    );
+  } finally {
+    globalThis.fetch = fetcher;
+  }
+});

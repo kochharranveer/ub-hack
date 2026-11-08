@@ -63,6 +63,26 @@ try {
     permissions: ["microphone", "camera"],
   });
   const page = await context.newPage();
+  page.setDefaultTimeout(15000);
+  // Exercise the real Web Audio/worklet path with fake input and a synthetic PCM reply.
+  let requests = 0;
+  await page.route("**/api/voice/speak", async (route) => {
+    requests++;
+    await route.fulfill({
+      status: 200,
+      headers: { "Content-Type": "audio/pcm", "X-Panda-Audio-Rate": "24000" },
+      body: (() => {
+        const data = Buffer.alloc(24000 * 2 * 3);
+        for (let i = 0; i < data.length / 2; i++)
+          data.writeInt16LE(
+            Math.round(Math.sin((i * 2 * Math.PI * 330) / 24000) * 6500),
+            i * 2,
+          );
+        return data;
+      })(),
+    });
+  });
+
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(origin);
@@ -112,9 +132,45 @@ try {
   });
   await workspace.waitFor();
   assert.equal(new URL(page.url()).pathname, "/");
+  const corner = page.getByRole("complementary", {
+    name: "Panda exercise companion",
+  });
+  const cornerRect = await corner.boundingBox();
+  assert.ok(cornerRect.x > 250 && cornerRect.y < 80);
+  const videoRect = await page
+    .getByLabel("Live camera preview", { exact: true })
+    .boundingBox();
+  assert.equal(videoRect.height, 844);
+  await page.getByText("Seated knee extension", { exact: true }).waitFor();
+  await workspace
+    .getByRole("button", { name: "Use microphone mode", exact: true })
+    .click();
+  await workspace.locator('[data-phase="listening"]').waitFor();
+  assert.equal(
+    await workspace.getByRole("textbox", { name: "Your message" }).count(),
+    0,
+  );
+  await page.screenshot({ path: path.join(output, "panda-guided-camera.png") });
+  await workspace
+    .getByRole("button", { name: "Use keyboard", exact: true })
+    .click();
+  await workspace
+    .getByRole("button", { name: "Enable camera", exact: true })
+    .click();
+  await page.waitForFunction(
+    () => document.querySelector("video")?.videoWidth > 0,
+  );
+  await page
+    .getByRole("region", { name: "Exercise setup", exact: true })
+    .waitFor();
   await page
     .getByLabel("Exercise", { exact: true })
     .selectOption("static-quads");
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  assert.equal(
+    await page.locator("video").evaluate((video) => video.srcObject),
+    null,
+  );
   await page.getByRole("button", { name: "Start set", exact: true }).click();
   await page
     .getByRole("button", { name: "Start guided hold", exact: true })
@@ -143,24 +199,6 @@ try {
   await say("My leg felt a little tired", "pain_check");
   await say("No pain or discomfort", "complete");
 
-  // Exercise the real Web Audio/worklet path with fake input and a synthetic PCM reply.
-  let requests = 0;
-  await page.route("**/api/voice/speak", async (route) => {
-    requests++;
-    await route.fulfill({
-      status: 200,
-      headers: { "Content-Type": "audio/pcm", "X-Panda-Audio-Rate": "24000" },
-      body: (() => {
-        const data = Buffer.alloc(24000 * 2 * 3);
-        for (let i = 0; i < data.length / 2; i++)
-          data.writeInt16LE(
-            Math.round(Math.sin((i * 2 * Math.PI * 330) / 24000) * 6500),
-            i * 2,
-          );
-        return data;
-      })(),
-    });
-  });
   await page
     .getByRole("button", { name: "Exit exercise", exact: true })
     .click();

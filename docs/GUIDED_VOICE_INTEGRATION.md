@@ -23,7 +23,7 @@ The new Panda home follows the supplied slate/taupe reference: a rounded blurred
 
 ElevenLabs TTS streams bounded 24kHz signed 16-bit mono PCM through `/api/voice/speak` when requested with `Accept: audio/pcm`. Existing MP3 clients remain supported. Playback begins before EOF. Stop cancels the upstream reader and queued audio nodes. AudioWorklet capture preserves the start of utterances, ends after a 650ms pause, and supports sustained speech interruption when echo cancellation is reported. Other browsers retain recording/native fallbacks and tap-to-interrupt. No play-audio button is required. Per-utterance model calls receive retained patient context; this is not an always-open realtime model session.
 
-No new keys are required. Existing Panda Gemini/ElevenLabs settings are reused. Optional Rehab Gemini phrasing stays off unless separately configured; deterministic exercise cues work without it.
+No new keys are required. Connected Rehab now reuses the configured Panda Gemini key/model when separate Rehab settings are absent. An explicit `REHAB_GEMINI_MODE=off` remains respected; standalone defaults remain off. Gemini selects a validated wording variant, and unavailable/rate-limited generation completes with the deterministic cue. No pending phrase is marked spoken: only finalized feedback is forwarded to Panda, attributed in patient memory and played through the existing ElevenLabs voice.
 
 ## Storage and release
 
@@ -31,10 +31,20 @@ The local migration `supabase/migrations/20261108060015_guided_rehab_storage.sql
 
 ## Verification on this revision
 
-- `npm run check`: 162 tests, including imported evaluator tests and new streaming, interruption, owner-report integration and authenticated patient-isolation regressions.
+- `npm run check`: 164 tests, including imported evaluator tests and new streaming, interruption, owner-report integration and authenticated patient-isolation regressions.
 - `npm run build`: all three apps.
 - `npm run test:integration`: 32 connected checks plus three standalone app checks. Includes real HTTP calls through the gateway for the guided owner API, verified feedback, Panda review, Care report retrieval and acknowledgement.
-- `npm run test:browser`: isolated Chrome with fake media devices and synthetic PCM. Checks the full agenda, embedded patient-confirmed hold, saved result, post-exercise review, no-scroll responsive home, inline typing, voice playback, circular visualizer and tap interruption.
+- `npm run test:browser`: isolated Chrome with fake media devices and synthetic PCM. Checks the full agenda, full-height camera, corner Panda, microphone/typing switches, local pose initialization with fake video, embedded patient-confirmed hold, saved result, post-exercise review, no-scroll responsive home, inline typing, voice playback, circular visualizer and tap interruption.
 - One live fictional ElevenLabs greeting returned PCM: first chunk 542ms, complete response 619ms, 258578 bytes. This is a single provider/network measurement, not full microphone-to-response latency or a guarantee.
 
 Human listening, real microphone echo/interruption on phones and physical camera/rep-counting acceptance remain pending. Browser tests do not substitute for those checks. Doctor availability/booking and EHR are still pending as requested.
+
+## Camera-first exercise view
+
+The embedded workspace uses `presentation="camera"`. Live video and the aligned pose overlay fill the screen; Panda's circular visualizer and mic/keyboard controls remain in the top-right corner. Centered text gives the current guidance or Panda's spoken/review response. Exercise/side selection and calibration sit in a setup sheet. The standalone diagnostic workspace remains available at `/rehab`.
+
+The same engine and canonical owner APIs drive both presentations. Exit attempts to save an interrupted session before closing. A Panda discomfort request stops and saves the current set while keeping the companion mounted; the owner report does not override the pending care concern. Starting another set is disabled while Panda is reviewing the result.
+
+Finalized Gemini feedback retains text source/revision in patient memory and is included among the model's remembered topics. Immediate display can use the fallback while generation is pending; voice waits for the final revision, avoiding duplicate fallback/generated speech. Regression checks cover this handoff and reuse of the existing server-only Panda key.
+
+The live Gemini feedback check on this revision returned `rate_limited`. The connection is configured, but current live Gemini-generated conversation/wording is limited by the provider account. Built-in exercise cues remain available; no live Gemini success is claimed for this check.

@@ -227,7 +227,6 @@ export default function Panda() {
   }, [c.text]);
   useEffect(() => {
     if (c.reply?.pauseExercise) {
-      setExerciseOpen(false);
       return;
     }
     if (
@@ -626,37 +625,133 @@ export default function Panda() {
           className={styles.exerciseShell}
           aria-label="Exercise with Panda"
         >
-          <div className={styles.exerciseHeader}>
-            <strong>Exercise · Panda stays with you</strong>
-            <button
-              type="button"
-              onClick={() => {
-                c.stop();
-                setExerciseOpen(false);
-              }}
-            >
-              Exit exercise
-            </button>
-          </div>
-          <RehabWorkspace onEvent={c.exerciseFeedback} onAskPanda={talk} />
-          <div className={styles.exerciseInline}>
-            <div className={styles.exerciseInlineTop}>
-              <strong>Panda · {c.checkin?.stage?.replaceAll("_", " ")}</strong>
-              <button
-                type="button"
-                aria-label={
-                  mode === "text" ? "Use microphone mode" : "Use keyboard"
-                }
-                onClick={keyboard}
+          <RehabWorkspace
+            presentation="camera"
+            canStart={c.checkin?.stage === "exercise"}
+            onEvent={c.exerciseFeedback}
+            onAskPanda={talk}
+            pauseRequested={Boolean(c.reply?.pauseExercise)}
+            onExit={() => {
+              c.stop();
+              setExerciseOpen(false);
+            }}
+            pandaMessage={
+              c.checkin?.stage !== "exercise" ||
+              ["speaking", "speech_loading"].includes(c.phase)
+                ? c.reply?.speechText || c.reply?.message
+                : undefined
+            }
+            companion={
+              <div
+                className={styles.cameraPanda}
+                aria-label="Voice conversation"
               >
-                {mode === "text" ? <MicIcon /> : <PenIcon />}
-              </button>
-              <button type="button" onClick={() => void c.retryFeedback()}>
-                Sync
-              </button>
-            </div>
-            {interaction()}
-          </div>
+                <VoiceCircle
+                  phase={mode === "voice" ? c.phase : "idle"}
+                  readLevels={c.audioLevels}
+                />
+                <span>
+                  Panda{" "}
+                  <small>
+                    {mode !== "voice"
+                      ? "Ready to listen"
+                      : c.phase === "listening"
+                        ? "Listening"
+                        : c.phase === "speaking"
+                          ? "Speaking"
+                          : c.phase === "thinking" ||
+                              c.phase === "speech_loading"
+                            ? "One moment"
+                            : "With you"}
+                  </small>
+                </span>
+                <div>
+                  {mode !== "text" && (
+                    <button
+                      type="button"
+                      aria-label={
+                        ["speaking", "speech_loading"].includes(c.phase)
+                          ? "Interrupt Panda"
+                          : mode !== "voice"
+                            ? "Talk to Panda"
+                            : active
+                              ? "Mute conversation"
+                              : "Resume conversation"
+                      }
+                      onClick={() =>
+                        mode !== "voice"
+                          ? talk()
+                          : ["speaking", "speech_loading"].includes(c.phase)
+                            ? c.interrupt()
+                            : active
+                              ? c.stop()
+                              : c.listen()
+                      }
+                    >
+                      <MicIcon />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    aria-label={
+                      mode === "text" ? "Use microphone mode" : "Use keyboard"
+                    }
+                    onClick={keyboard}
+                  >
+                    {mode === "text" ? <MicIcon /> : <PenIcon />}
+                  </button>
+                </div>
+              </div>
+            }
+            conversation={
+              <>
+                <span className={styles.srOnly}>
+                  Panda · {c.checkin?.stage?.replaceAll("_", " ")}
+                </span>
+                {c.error && (
+                  <p className={styles.error} role="alert">
+                    {c.error}
+                    <button
+                      type="button"
+                      onClick={() => void c.retryFeedback()}
+                    >
+                      Retry sync
+                    </button>
+                  </p>
+                )}
+                {confirmations()}
+                {mode === "text" && (
+                  <form
+                    className={styles.exerciseComposer}
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void c.send(c.text, directDraft);
+                    }}
+                  >
+                    <label className={styles.srOnly} htmlFor="message">
+                      Your message
+                    </label>
+                    <textarea
+                      ref={composer}
+                      id="message"
+                      rows={2}
+                      value={c.text}
+                      maxLength={2000}
+                      placeholder="Tell Panda how you’re feeling…"
+                      onChange={(event) => c.setText(event.target.value)}
+                    />
+                    <button
+                      type="submit"
+                      aria-label="Send message"
+                      disabled={c.busy || !c.text.trim()}
+                    >
+                      <ArrowIcon />
+                    </button>
+                  </form>
+                )}
+              </>
+            }
+          />
         </section>
       )}
       <dialog
