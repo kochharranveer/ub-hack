@@ -212,13 +212,13 @@ test("guided feedback is fetched from Rehab, deduplicated and cannot cross patie
 test("Panda waits for finalized Gemini wording and keeps the source in patient context", async (t) => {
   const names = [
     "REHAB_GEMINI_MODE",
-    "REHAB_GEMINI_API_KEY",
+    "PANDA_GEMINI_API_KEY",
     "REHAB_GEMINI_MODEL",
   ];
   const previous = names.map((name) => process.env[name]);
   Object.assign(process.env, {
     REHAB_GEMINI_MODE: "controlled",
-    REHAB_GEMINI_API_KEY: "test-private",
+    PANDA_GEMINI_API_KEY: "test-private",
     REHAB_GEMINI_MODEL: "test-model",
   });
   t.after(() =>

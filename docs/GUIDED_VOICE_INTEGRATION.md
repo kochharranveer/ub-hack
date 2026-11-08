@@ -1,3 +1,5 @@
+> The latest upstream revision is now integrated through a separate adapter, with a complete unchanged reference copy. See [YUVRAJ_LATEST_INTEGRATION.md](YUVRAJ_LATEST_INTEGRATION.md). The details below describe the earlier integration and its history.
+
 # Circular companion and guided exercise integration
 
 ## Source and scope

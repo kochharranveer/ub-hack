@@ -451,3 +451,15 @@
     font-size: 8px;
   }
 }
+
+.landmarkNote {
+  display: block;
+  position: absolute;
+  bottom: 6px;
+  left: 12px;
+  right: 12px;
+  text-align: center;
+  font-size: 7px;
+  color: #e6eddd8f;
+  pointer-events: none;
+}

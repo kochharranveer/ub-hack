@@ -13,6 +13,8 @@ export const ContinueCheckinSchema = z.object({
   confirmationText: z.string().min(1).max(2000).optional(),
 }).strict();
 export const RehabBridgeEventSchema = z.discriminatedUnion("type", [
+  z.object({version:z.literal("1.0.0"),type:z.literal("guided_calibration"),calibrationId:z.string().uuid()}).strict(),
+  z.object({version:z.literal("1.0.0"),type:z.literal("guided_analysis"),sessionId:z.string().uuid(),batchSequence:z.number().int().positive()}).strict(),
   z.object({version:z.literal("1.0.0"),type:z.literal("guided_session_started"),sessionId:z.string().uuid()}).strict(),
   z.object({version:z.literal("1.0.0"),type:z.literal("guided_report_saved"),sessionId:z.string().uuid()}).strict(),
   z.object({version:z.literal("1.0.0"),type:z.literal("guided_feedback"),sessionId:z.string().uuid(),feedbackId:z.string().uuid()}).strict(),

@@ -219,6 +219,23 @@ try {
   await page
     .getByRole("region", { name: "Exercise setup", exact: true })
     .waitFor();
+  const models = page.getByRole("combobox", {
+    name: "Pose model",
+    exact: true,
+  });
+  assert.deepEqual(await models.locator("option").allTextContents(), [
+    "Lite",
+    "Full",
+    "Heavy",
+  ]);
+  await models.selectOption("full");
+  assert.equal(
+    await page.locator("video").evaluate((video) => video.srcObject),
+    null,
+  );
+  await page.screenshot({
+    path: path.join(output, "yuvraj-model-selection.png"),
+  });
   await page
     .getByLabel("Exercise", { exact: true })
     .selectOption("static-quads");

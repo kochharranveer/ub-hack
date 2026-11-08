@@ -17,7 +17,7 @@
     "start": "node scripts/run.mjs start all",
     "typecheck": "tsc -p apps/panda && tsc -p apps/care && tsc -p apps/rehab && tsc -p tsconfig.tests.json",
     "test": "node scripts/test.mjs",
-    "check": "npm run typecheck && npm test",
+    "check": "npm run verify:yuvraj && npm run typecheck && npm test",
     "test:integration": "node scripts/integration.mjs",
     "test:providers:live": "node --import tsx scripts/provider-smoke.mjs",
     "voice:purge": "node --import tsx scripts/voice-purge.mjs",
@@ -27,7 +27,9 @@
     "db:migrate": "node --import tsx scripts/production/migrate.mjs",
     "account:grant": "node --import tsx scripts/production/grant.mjs",
     "cv:assets": "node scripts/cv-assets.mjs",
-    "test:browser": "node scripts/test-browser.mjs"
+    "test:browser": "node scripts/test-browser.mjs",
+    "verify:yuvraj": "node scripts/verify-yuvraj.mjs",
+    "test:yuvraj:integration": "node scripts/test-yuvraj-integration.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.2.2",

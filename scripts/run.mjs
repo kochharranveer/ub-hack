@@ -1,3 +1,4 @@
+import { yuvrajEnvironment } from "../packages/yuvraj-integration/environment.mjs";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -21,6 +22,7 @@ const env = {
     process.env.PANDA_INTEGRATION ||
     (selected === "all" ? "connected" : "fixture"),
 };
+Object.assign(env,yuvrajEnvironment(env));
 const children = new Set();
 let stopping = false;
 function stop(code = 0) {

@@ -1,3 +1,4 @@
+import { yuvrajEnvironment } from "../packages/yuvraj-integration/environment.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp,rm } from "node:fs/promises";
@@ -23,9 +24,9 @@ function event(sequence:number,changes:Partial<CvEventCandidate>={}):CvEventCand
 function timing(ms=130000):CvTiming {return {elapsedTimeMs:ms,activeTimeMs:96000,pausedTimeMs:ms-96000,userPausedTimeMs:14000,trackingPausedTimeMs:20000,otherPausedTimeMs:ms-130000};}
 function finish(lastMeasurementSequence:number):CvFinishInput {return {requestId:randomUUID(),lastMeasurementSequence,report:{observedEndedAtUtc:"2026-11-07T22:02:10.000Z",completionStatus:"completed",terminationReason:"finished",timing:timing(),timingQuality:"complete"}};}
 function controlled(t:test.TestContext) {
-  const names=["REHAB_GEMINI_MODE","REHAB_GEMINI_API_KEY","REHAB_GEMINI_MODEL"];
+  const names=["REHAB_GEMINI_MODE","PANDA_GEMINI_API_KEY","REHAB_GEMINI_MODEL"];
   const before=names.map(n=>process.env[n]);
-  process.env.REHAB_GEMINI_MODE="controlled";process.env.REHAB_GEMINI_API_KEY="test-only-key";process.env.REHAB_GEMINI_MODEL="test-model";
+  process.env.REHAB_GEMINI_MODE="controlled";process.env.PANDA_GEMINI_API_KEY="test-only-key";process.env.REHAB_GEMINI_MODEL="test-model";
   t.after(()=>names.forEach((n,i)=>{if(before[i]===undefined)delete process.env[n];else process.env[n]=before[i];}));
 }
 test("CV ordered admission rejects gaps, deduplicates requests, and binds reports to their owner",async t=>{
@@ -62,15 +63,13 @@ test("Short observed holds differ from interrupted holds and use captured target
   assert.equal(interrupted.feedback.length,0);
   await assert.rejects(()=>service.events("actor",session.id,{requestId:randomUUID(),event:event(3,{holdMs:3100})}),/Qualifying count/);
 });
-test("Paused camera sessions cannot report qualified movement; overshoot cannot qualify",async t=>{
-  const {service}=await setup(t);
-  const s=await service.start("actor",{requestId:randomUUID(),exerciseId:"seated-knee-extension",side:"right",startedAtUtc:clock,evidence:"camera_estimated"});
-  await assert.rejects(()=>service.events("actor",s.id,{requestId:randomUUID(),event:event(1)}),/untracked/);
-  await service.events("actor",s.id,{requestId:randomUUID(),event:{eventId:randomUUID(),sequence:1,observedOffsetMs:0,type:"tracking_changed",valid:true}});
-  const overshoot=await service.events("actor",s.id,{requestId:randomUUID(),event:event(2,{qualifying:false,reason:"target_overshoot"} as Partial<CvEventCandidate>)});
-  assert.equal(overshoot.session.completedReps,0);
-  await service.events("actor",s.id,{requestId:randomUUID(),event:{eventId:randomUUID(),sequence:3,observedOffsetMs:20001,type:"session_state_changed",action:"pause"}});
-  await assert.rejects(()=>service.events("actor",s.id,{requestId:randomUUID(),event:event(4)}),/paused/);
+test("camera attempts require Gemini; simulated overshoot and paused attempts cannot qualify",async t=>{
+ const {service,session}=await setup(t);
+ const camera=await service.start("actor",{requestId:randomUUID(),exerciseId:"seated-knee-extension",side:"right",startedAtUtc:clock,evidence:"camera_estimated"});
+ await assert.rejects(()=>service.events("actor",camera.id,{requestId:randomUUID(),event:event(1)}),error=>(error as {code:string}).code==="GEMINI_ANALYSIS_REQUIRED");
+ const overshoot=await service.events("actor",session.id,{requestId:randomUUID(),event:event(1,{qualifying:false,reason:"target_overshoot"} as Partial<CvEventCandidate>)});assert.equal(overshoot.session.completedReps,0);
+ await service.events("actor",session.id,{requestId:randomUUID(),event:{eventId:randomUUID(),sequence:2,observedOffsetMs:20001,type:"session_state_changed",action:"pause"}});
+ await assert.rejects(()=>service.events("actor",session.id,{requestId:randomUUID(),event:event(3)}),/paused/);
 });
 test("Gemini text update gets a new change cursor without another measurement and retries call provider once",async t=>{
   controlled(t);let calls=0;let payload="";
@@ -164,10 +163,11 @@ test("Body limits reject oversized or non-JSON input",async()=>{
 
 
 test("connected exercise feedback reuses Panda Gemini privately and respects explicit off",async t=>{
-  const names=["PANDA_INTEGRATION","PANDA_AI_MODE","PANDA_GEMINI_API_KEY","PANDA_GEMINI_MODEL","REHAB_GEMINI_MODE","REHAB_GEMINI_API_KEY","REHAB_GEMINI_MODEL"];
+  const names=["PANDA_INTEGRATION","PANDA_AI_MODE","PANDA_GEMINI_API_KEY","PANDA_GEMINI_MODEL","REHAB_GEMINI_MODE","PANDA_GEMINI_API_KEY","REHAB_GEMINI_MODEL"];
   const before=names.map(name=>process.env[name]);t.after(()=>names.forEach((name,i)=>{if(before[i]===undefined)delete process.env[name];else process.env[name]=before[i];}));
   for(const name of names)delete process.env[name];
   Object.assign(process.env,{PANDA_INTEGRATION:"connected",PANDA_AI_MODE:"gemini",PANDA_GEMINI_API_KEY:"private-shared-key",PANDA_GEMINI_MODEL:"test-model"});
+  Object.assign(process.env,yuvrajEnvironment(process.env));
   assert.deepEqual(geminiReadiness(),{mode:"controlled",configured:true,model:"test-model"});assert.doesNotMatch(JSON.stringify(geminiReadiness()),/private-shared-key/);
   let calls=0;
   const fetcher=async(_url:unknown,options?:RequestInit)=>{calls++;assert.equal(new Headers(options?.headers).get("x-goog-api-key"),"private-shared-key");return new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{parts:[{text:'{"phraseId":"gentle"}'}]}}]}));};

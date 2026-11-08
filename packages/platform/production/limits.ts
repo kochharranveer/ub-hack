@@ -7,11 +7,12 @@ export async function consumeLimit(
   method: string,
 ) {
   const guidedGeneration=/^\/rehab\/api\/cv\/v1\/sessions\/[^/]+\/feedback\/[^/]+\/generate$/.test(path);
-  const provider = guidedGeneration ||
+  const guidedAnalysis=/^\/rehab\/api\/cv\/v1\/(?:calibrate$|sessions\/[^/]+\/analyze$)/.test(path);
+  const provider = guidedGeneration || guidedAnalysis ||
     /^\/api\/voice\/(?:turn|checkin\/(?:start|answer|continue)|speak|transcribe)$/.test(
       path,
     );
-  const bucket = provider ? "provider" : "api";
+  const bucket = guidedAnalysis ? "rehab_provider" : provider ? "provider" : "api";
   const minute = provider ? 45 : 240;
   const day = provider ? 500 : 10000;
   await databaseTransaction(actor.subject, actor.patientId, async (client) => {

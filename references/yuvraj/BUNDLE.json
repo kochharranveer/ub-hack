@@ -1,0 +1,16 @@
+{
+  "file": "published-branches.bundle",
+  "sha256": "37e30c3d9cac58567c145f0c42d650578cd7be9199cff20508d6c49bffcfea32",
+  "bytes": 9609760,
+  "branches": {
+    "refs/remotes/yuvraj/main": "165d7b74fe67e972389e59dd981ef984ebccacbb",
+    "refs/remotes/yuvraj/yuvraj/camera-to-text": "371198efaeb7ac953e8a8c7161daa59706efe321",
+    "refs/remotes/yuvraj/yuvraj/cloudflare-public-demo": "68e8e8de1d3eea1ac54c22b6f60753a0168db295",
+    "refs/remotes/yuvraj/yuvraj/pose-model-selector": "68f312f4f40d78197b48bcfd5817edfbac5bcc30",
+    "refs/remotes/yuvraj/yuvraj/rep-counting-fix": "165d7b74fe67e972389e59dd981ef984ebccacbb"
+  },
+  "credentialPatternScan": {
+    "blobsChecked": 345,
+    "matches": 0
+  }
+}
