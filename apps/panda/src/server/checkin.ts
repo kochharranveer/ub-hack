@@ -335,9 +335,8 @@ export function checkinService(
           const ref=calibrationResult.careReference;if(!ref||ref.patientId!==current.patientId||ref.planId!==s.planId||ref.planVersion!==s.planVersion)throw new DomainError("FORBIDDEN","Calibration belongs to another care context.",403);
           if(s.stage!=="exercise"||s.concernPending||now()-Date.parse(calibrationResult.acceptedAt)>10000)return question(s,current);
           const result=calibrationResult.result;if(tx.events("exercise_feedback",200).some(e=>e.metadata.calibrationId===calibrationResult.calibrationId))return question(s,current);
-          const previous=tx.events("exercise_feedback",20).find(e=>e.metadata.textSource==="gemini_calibration");
           event(tx,s,"guided-calibration:"+calibrationResult.calibrationId,"exercise_feedback",result.cue||"Calibration updated.","rehab_report",{calibrationId:calibrationResult.calibrationId,textSource:"gemini_calibration",detectedPosition:result.detectedPosition,angleDeg:result.angleDeg,confidence:result.confidence,exerciseId:calibrationResult.exerciseId,side:calibrationResult.side});
-          if(!result.cue||previous?.quote===result.cue)return question(s,current);
+          if(!result.cue)return question(s,current);
           return reply(s,result.cue,{exerciseCue:{eventId:calibrationResult.calibrationId,code:"GEMINI_CALIBRATION",expiresAt:new Date(Date.parse(calibrationResult.acceptedAt)+10000).toISOString()}});
         }
         if(guided){
@@ -357,9 +356,8 @@ export function checkinService(
             if(analysisResult.batchSequence!==v.event.batchSequence||analysisResult.session.id!==guided.id||analysisResult.sessionControlRevision!==guided.sessionControlRevision||guided.status!=="running"||now()-Date.parse(analysisResult.acceptedAt)>10000)return question(s,current);
             const analysis=analysisResult.analysis;const batchSequence=v.event.batchSequence;
             if(tx.events("exercise_feedback",200).some(e=>e.metadata.analysisBatchSequence===batchSequence&&e.metadata.sessionId===guided.id))return question(s,current);
-            const previous=tx.events("exercise_feedback",200).find(e=>e.metadata.sessionId===guided.id&&e.metadata.analysisBatchSequence);
             event(tx,s,"guided-analysis:"+guided.id+":"+v.event.batchSequence,"exercise_feedback",analysis.cue||"Movement analysis updated.","rehab_report",{sessionId:guided.id,analysisBatchSequence:v.event.batchSequence,textSource:"gemini_rep_analysis",confidence:analysis.confidence,phase:analysis.phase,completedReps:analysis.completedReps,movementCycles:analysis.movementCycles,shortHolds:analysis.shortHolds,rangeDegrees:analysis.rangeDegrees,sourceRoute:"/rehab/api/cv/v1/sessions/"+guided.id+"/analysis"});
-            if(!analysis.cue||previous?.quote===analysis.cue)return question(s,current);
+            if(!analysis.cue)return question(s,current);
             return reply(s,analysis.cue,{exerciseCue:{eventId:guided.id+":"+v.event.batchSequence,code:"GEMINI_ANALYSIS",expiresAt:new Date(Date.parse(analysisResult.acceptedAt)+10000).toISOString()}});
           }
           if(cue){

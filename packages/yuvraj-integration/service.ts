@@ -13,6 +13,7 @@ import {
 import { domainStore } from "../platform/domain-store";
 import { DomainError, dataFile } from "../platform/json-store";
 import { connected, getCare } from "../platform/peers";
+import { pandaCoachingFetcher } from "./coaching-provider";
 import { requireRole } from "../platform/production/context";
 import type { CareSnapshot } from "../contracts/care";
 import type {
@@ -108,7 +109,11 @@ export function cvService(
         return result;
       }),
   };
-  const upstream = upstreamService(file, { ...options, store });
+  const upstream = upstreamService(file, {
+    ...options,
+    store,
+    fetcher: pandaCoachingFetcher(options.fetcher),
+  });
   async function safely<T>(
     operation: () => Promise<T>,
     provider?: "calibration" | "analysis",

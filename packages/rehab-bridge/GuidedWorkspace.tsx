@@ -67,6 +67,8 @@ type Run = {
   analysisAt: number;
   analysisPromise: Promise<void> | null;
   analysisMissing: boolean;
+  analysisRetryAt: number;
+  analysisFailures: number;
   transport: SessionTransport;
   config: EngineConfig;
   engine: ExerciseState;
@@ -126,6 +128,7 @@ type CalibrationCandidate = {
 
 export default function GuidedWorkspace({
   onEvent,
+  onCoachingPause,
   onAskPanda,
   presentation = "workspace",
   companion,
@@ -136,6 +139,7 @@ export default function GuidedWorkspace({
   canStart = true,
 }: {
   onEvent?: (event: RehabBridgeEvent) => void;
+  onCoachingPause?: () => void;
   onAskPanda?: () => void;
   presentation?: "workspace" | "camera";
   companion?: ReactNode;
@@ -145,8 +149,8 @@ export default function GuidedWorkspace({
   pauseRequested?: boolean;
   canStart?: boolean;
 } = {}) {
-  const callbacks = useRef({ onEvent, onAskPanda });
-  callbacks.current = { onEvent, onAskPanda };
+  const callbacks = useRef({ onEvent, onAskPanda, onCoachingPause });
+  callbacks.current = { onEvent, onAskPanda, onCoachingPause };
   const [setupOpen, setSetupOpen] = useState(false);
   const [context, setContext] = useState<CvContext | null>(null);
   const [exercise, setExercise] = useState<CvExerciseId>(
@@ -483,6 +487,10 @@ export default function GuidedWorkspace({
         personCount: frame.personCount,
         landmarks,
       });
+      if (active.poseFrames.length > 24) {
+        active.poseFrames = active.poseFrames.slice(-24);
+        active.analysisMissing = true;
+      }
     }
   }
   const camera = usePoseCamera(
@@ -505,12 +513,20 @@ export default function GuidedWorkspace({
     },
     poseModel,
   );
+  const cameraWasTracking = useRef(false);
+  useEffect(() => {
+    if (cameraWasTracking.current && camera.status !== "tracking")
+      callbacks.current.onCoachingPause?.();
+    cameraWasTracking.current = camera.status === "tracking";
+  }, [camera.status]);
 
   async function analyzePendingPose(r: Run, flush = false): Promise<void> {
+    if (performance.now() < r.analysisRetryAt) return;
     if (r.analysisPromise) {
       if (flush) await r.analysisPromise;
       else return;
     }
+    if (performance.now() < r.analysisRetryAt) return;
     if (!context || !r.poseFrames.length || (!flush && r.poseFrames.length < 3))
       return;
     const frames = r.poseFrames.splice(0, 8),
@@ -523,6 +539,8 @@ export default function GuidedWorkspace({
           context.csrfToken,
         );
         r.analysisBatchSequence = result.batchSequence;
+        r.analysisFailures = 0;
+        r.analysisRetryAt = 0;
         setRepAnalysis(result.analysis);
         setSession(result.session);
         if (run.current !== r || r.paused || r.terminal) return;
@@ -539,6 +557,11 @@ export default function GuidedWorkspace({
         setError("");
       } catch (e) {
         r.analysisMissing = true;
+        r.analysisFailures++;
+        r.analysisRetryAt =
+          performance.now() +
+          Math.min(30000, 1500 * 2 ** Math.min(5, r.analysisFailures));
+        callbacks.current.onCoachingPause?.();
         setError(
           "Movement analysis is unavailable. Previous counts are kept; missing movements will not be invented.",
         );
@@ -997,6 +1020,8 @@ export default function GuidedWorkspace({
         analysisAt: start,
         analysisPromise: null,
         analysisMissing: false,
+        analysisRetryAt: 0,
+        analysisFailures: 0,
         transport,
         config,
         engine: createExerciseState(),
@@ -1069,6 +1094,7 @@ export default function GuidedWorkspace({
   ) {
     const r = run.current;
     if (!r || r.finishing) return;
+    callbacks.current.onCoachingPause?.();
     r.finishing = true;
     setBusy(true);
     setError("");
@@ -1142,6 +1168,7 @@ export default function GuidedWorkspace({
   function pauseResume() {
     const r = run.current;
     if (!r || r.terminal) return;
+    callbacks.current.onCoachingPause?.();
     const now = performance.now();
     if (!r.paused) {
       r.poseFrames = [];

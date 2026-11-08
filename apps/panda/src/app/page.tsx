@@ -194,7 +194,8 @@ export default function Panda() {
   }
   function talk() {
     setMode("voice");
-    if (exerciseOpen && c.checkin && c.checkin.stage !== "complete") c.listen();
+    if (exerciseOpen && c.checkin && c.checkin.stage !== "complete")
+      c.listen(true);
     else void c.activateVoice();
   }
   function openExercise() {
@@ -562,6 +563,7 @@ export default function Panda() {
             presentation="camera"
             canStart={c.checkin?.stage === "exercise" && !c.busy}
             onEvent={c.exerciseFeedback}
+            onCoachingPause={c.cancelExerciseCoaching}
             onAskPanda={talk}
             pauseRequested={Boolean(c.reply?.pauseExercise)}
             onExit={closeExercise}
@@ -584,7 +586,7 @@ export default function Panda() {
                   Panda{" "}
                   <small>
                     {mode !== "voice"
-                      ? "Ready to listen"
+                      ? "Tap to hear coaching"
                       : c.phase === "listening"
                         ? "Listening"
                         : c.phase === "speaking"
@@ -615,7 +617,7 @@ export default function Panda() {
                             ? c.interrupt()
                             : active
                               ? c.stop()
-                              : c.listen()
+                              : c.listen(true)
                       }
                     >
                       <MicIcon />

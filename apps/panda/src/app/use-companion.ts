@@ -6,6 +6,12 @@ import { spokenConfirmation } from "./voice-confirmation";
 import { ConversationMicrophone } from "./conversation-microphone";
 import { pcmRecognition, preparePcmInput } from "./pcm-recognition";
 import { playbackEcho } from "./speech-turn";
+import {
+  ExerciseCoachingCadence,
+  queueExerciseFeedback,
+  transientExerciseEvent,
+  type PendingExerciseFeedback,
+} from "./exercise-coaching";
 import { ConversationAudio } from "./conversation-audio";
 import type { VoiceContext, VoiceHistoryTurn, VoiceReply } from "@contracts";
 import type {
@@ -33,6 +39,8 @@ type Recognition = {
     | null;
   onerror: ((e: { error: string; message?: string }) => void) | null;
   onend: (() => void) | null;
+  onspeechstart?: (() => void) | null;
+  onspeechend?: (() => void) | null;
   start(): void;
   abort(): void;
 };
@@ -105,10 +113,13 @@ export function useCompanion() {
   const heardProposal = useRef<string | null>(null),
     queuedCue = useRef<VoiceReply | null>(null),
     queuedReview = useRef<VoiceReply | null>(null);
-  const feedbackQueue = useRef<
-    { requestId: string; checkinId: string; event: RehabBridgeEvent }[]
-  >([]);
+  const feedbackQueue = useRef<PendingExerciseFeedback[]>([]);
+  const coachingCadence = useRef(new ExerciseCoachingCadence());
+  const coachingEpoch = useRef(0);
+  const coachingTick = useRef<() => void>(() => {});
   const flushingFeedback = useRef(false);
+  const feedbackFailures = useRef(0),
+    feedbackRetryAt = useRef(0);
   const live = useRef(true);
   const generation = useRef(0);
   const soundGeneration = useRef(0);
@@ -144,6 +155,8 @@ export function useCompanion() {
       rec.onresult = null;
       rec.onerror = null;
       rec.onend = null;
+      rec.onspeechstart = null;
+      rec.onspeechend = null;
       rec.abort();
     }
   }
@@ -164,6 +177,10 @@ export function useCompanion() {
     microphone.current.close();
     pcmReady.current = false;
     queuedCue.current = null;
+    coachingEpoch.current++;
+    feedbackQueue.current = feedbackQueue.current.filter(
+      (item) => !transientExerciseEvent(item.event),
+    );
     queuedReview.current = null;
     heardProposal.current = null;
     for (const controller of requests.current) controller.abort();
@@ -527,6 +544,18 @@ export function useCompanion() {
               () => microphone.current.open(),
             );
     recognition.current = rec;
+    if (selected === "native") {
+      const native = rec as Recognition;
+      native.onspeechstart = () => {
+        if (recognition.current === rec) patientSpeaking.current = true;
+      };
+      native.onspeechend = () => {
+        if (recognition.current === rec) {
+          patientSpeaking.current = false;
+          transcribing.current = true;
+        }
+      };
+    }
     rec.lang = "en-US";
     rec.continuous = false;
     rec.interimResults = false;
@@ -536,6 +565,7 @@ export function useCompanion() {
     rec.onresult = (e) => {
       if (recognition.current !== rec || !live.current) return;
       transcribing.current = false;
+      patientSpeaking.current = false;
       const transcript = e.results[0][0].transcript.trim();
       if (!transcript) {
         received = false;
@@ -595,6 +625,7 @@ export function useCompanion() {
     };
     rec.onend = () => {
       transcribing.current = false;
+      patientSpeaking.current = false;
       if (recognition.current === rec && live.current) {
         recognition.current = null;
         if (handsfree.current && !received && !failed && !inFlight.current) {
@@ -813,7 +844,8 @@ export function useCompanion() {
       inFlight.current ||
       speaking.current ||
       patientSpeaking.current ||
-      transcribing.current
+      transcribing.current ||
+      Date.now() < feedbackRetryAt.current
     )
       return;
     flushingFeedback.current = true;
@@ -827,14 +859,20 @@ export function useCompanion() {
         !inFlight.current
       ) {
         const item = feedbackQueue.current[0];
+        const epoch = coachingEpoch.current;
         const result = await request<VoiceReply>(
           "voice/exercise-feedback",
           item,
         );
-        feedbackQueue.current.shift();
+        feedbackQueue.current = feedbackQueue.current.filter(
+          (queued) => queued.requestId !== item.requestId,
+        );
+        feedbackFailures.current = 0;
+        feedbackRetryAt.current = 0;
         if (!live.current) break;
         // Camera/tracking updates must not interrupt a patient mid-sentence.
         if (result.exerciseCue) {
+          if (epoch !== coachingEpoch.current) continue;
           queuedCue.current = result;
           speakQueuedCue();
         } else if (
@@ -859,9 +897,13 @@ export function useCompanion() {
         }
       }
     } catch (e) {
+      feedbackFailures.current++;
+      feedbackRetryAt.current =
+        Date.now() +
+        Math.min(30000, 1000 * 2 ** Math.min(5, feedbackFailures.current));
       if (live.current)
         setError(
-          "Exercise is saved in Rehab, but Panda context sync needs a retry: " +
+          "Panda couldn't receive the latest exercise update. Reconnect to retry: " +
             (e as Error).message,
         );
     } finally {
@@ -871,7 +913,9 @@ export function useCompanion() {
   function exerciseFeedback(event: RehabBridgeEvent) {
     const current = checkinRef.current;
     if (!current) return;
-    feedbackQueue.current.push({
+    if (["report_saved", "guided_report_saved"].includes(event.type))
+      cancelExerciseCoaching();
+    feedbackQueue.current = queueExerciseFeedback(feedbackQueue.current, {
       requestId: crypto.randomUUID(),
       checkinId: current.id,
       event,
@@ -899,7 +943,7 @@ export function useCompanion() {
     }>("voice/memory");
   }
 
-  async function activateVoice() {
+  async function activateVoice(forExercise = false) {
     if (inFlight.current) return;
     inFlight.current = true;
     const token = ++generation.current;
@@ -936,7 +980,10 @@ export function useCompanion() {
       changeMicConsent(true);
       changeSpeechConsent(true);
       inFlight.current = false;
-      await beginCheckin(true);
+      if (forExercise && checkinRef.current) {
+        handsfree.current = true;
+        if (!speakQueuedCue()) mic();
+      } else await beginCheckin(true);
     } catch (e) {
       if (live.current && token === generation.current) {
         handsfree.current = false;
@@ -984,6 +1031,7 @@ export function useCompanion() {
     if (!cue || !handsfree.current) return false;
     if (
       checkinRef.current?.stage !== "exercise" ||
+      latestReply.current?.pauseExercise ||
       cue.checkin?.id !== checkinRef.current.id ||
       (cue.exerciseCue?.expiresAt &&
         Date.parse(cue.exerciseCue.expiresAt) <= Date.now())
@@ -991,18 +1039,46 @@ export function useCompanion() {
       queuedCue.current = null;
       return false;
     }
+    const decision = coachingCadence.current.decide(cue);
+    if (decision === "wait") return false;
     queuedCue.current = null;
+    if (decision === "drop") return false;
     acceptReply(cue);
     void speak();
     return true;
   }
-  function listen() {
+  function cancelExerciseCoaching() {
+    coachingEpoch.current++;
+    queuedCue.current = null;
+    feedbackQueue.current = feedbackQueue.current.filter(
+      (item) => !transientExerciseEvent(item.event),
+    );
+    if (latestReply.current?.exerciseCue && speaking.current) {
+      stopSound();
+      setPhase(settledPhase());
+      if (handsfree.current && !inFlight.current) {
+        if (recognition.current) setPhase("listening");
+        else mic();
+      }
+    }
+  }
+  coachingTick.current = () => {
+    if (!live.current) return;
+    if (feedbackQueue.current.length) void flushFeedback();
+    speakQueuedCue();
+  };
+  useEffect(() => {
+    const timer = setInterval(() => coachingTick.current(), 250);
+    return () => clearInterval(timer);
+  }, []);
+
+  function listen(forExercise = false) {
     if (
       latestReply.current?.conversationEnded ||
       !micConsentRef.current ||
       !canMic
     ) {
-      void activateVoice();
+      void activateVoice(forExercise);
       return;
     }
     const token = generation.current;
@@ -1083,7 +1159,11 @@ export function useCompanion() {
     openExercise,
     beginCheckin,
     exerciseFeedback,
-    retryFeedback: flushFeedback,
+    cancelExerciseCoaching,
+    retryFeedback: () => {
+      feedbackRetryAt.current = 0;
+      return flushFeedback();
+    },
     rememberedContext,
   };
 }
