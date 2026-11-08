@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: panda-care
+    runtime: node
+    region: virginia
+    plan: free
+    buildCommand: npm ci --include=dev && npm run check && npm run build
+    startCommand: npm run start:production
+    healthCheckPath: /api/health
+    autoDeployTrigger: "off"
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: PANDA_RUNTIME
+        value: production
+      - key: PANDA_INTEGRATION
+        value: connected
+      - key: PANDA_CARE_ORIGIN
+        value: http://127.0.0.1:3001
+      - key: PANDA_REHAB_ORIGIN
+        value: http://127.0.0.1:3002
+      - key: PANDA_SUPABASE_URL
+        sync: false
+      - key: PANDA_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: PANDA_DATABASE_URL
+        sync: false
+      - key: PANDA_DATABASE_CA
+        sync: false
+      - key: PANDA_AI_MODE
+        value: gemini
+      - key: PANDA_GEMINI_API_KEY
+        sync: false
+      - key: PANDA_GEMINI_MODEL
+        sync: false
+      - key: PANDA_TTS_MODE
+        value: elevenlabs
+      - key: PANDA_ELEVENLABS_API_KEY
+        sync: false
+      - key: PANDA_ELEVENLABS_VOICE_ID
+        sync: false
+      - key: PANDA_ELEVENLABS_MODEL_ID
+        sync: false
+      - key: PANDA_STT_MODEL
+        value: scribe_v2
