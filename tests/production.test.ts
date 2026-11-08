@@ -441,3 +441,24 @@ test("public self-signup cannot activate app access; only a verified provider in
   assert.equal(invited.role, "patient");
   assert.equal(invited.patientId, subject);
 });
+
+test("patient and doctor portal instances share requests, acknowledgements and approved plan updates", async () => {
+  const patientPortal = careService(), doctorPortal = careService();
+  const otherPatientBefore = await as(actorB, () => patientPortal.snapshot());
+  const request = await as(actorA, () => patientPortal.help({ requestId: randomUUID(), quote: "Synthetic request: please arrange a follow-up." }));
+  const doctorView = await as(clinician, () => doctorPortal.snapshot());
+  assert.ok(doctorView.help.some(item => item.id === request.id && item.status === "open"));
+  await as(clinician, () => doctorPortal.acknowledgeHelp(request.id, { requestId: randomUUID() }));
+  assert.equal((await as(actorA, () => careService().snapshot())).help.find(item => item.id === request.id)?.status, "acknowledged");
+  const draft = await as(clinician, () => doctorPortal.importPlan({ requestId: randomUUID(), sourceText: "Medication: follow the updated approved instructions.\nExercise: follow the updated approved movement.\nFollow-up: contact the care team to arrange a time." }));
+  const beforeApproval = await as(actorA, () => patientPortal.snapshot());
+  assert.equal(beforeApproval.plan?.id, doctorView.plan?.id);
+  assert.deepEqual(beforeApproval.drafts, []);
+  const approved = await as(clinician, () => doctorPortal.approve(draft.id, { requestId: randomUUID(), expectedCurrentVersion: beforeApproval.plan?.version || 0 }));
+  const patientView = await as(actorA, () => careService().snapshot());
+  assert.equal(patientView.plan?.id, approved.id);
+  assert.equal(patientView.plan?.version, (beforeApproval.plan?.version || 0) + 1);
+  assert.ok(patientView.tasks.every(task => task.planId === approved.id && task.planVersion === approved.version));
+  assert.deepEqual(await as(actorB, () => patientPortal.snapshot()), otherPatientBefore);
+  await assert.rejects(() => as(actorA, () => patientPortal.acknowledgeHelp(request.id, { requestId: randomUUID() })), /clinician/);
+});

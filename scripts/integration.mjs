@@ -72,7 +72,7 @@ try {
   if (!ready) throw Error("Servers failed to start: " + logs);
   for (const [route, label] of [
     ["/", "Talk to Panda"],
-    ["/care", "A clear plan."],
+    ["/care", "Your care,"],
     ["/rehab", "Every movement."],
   ]) {
     const r = await fetch(origin + route);

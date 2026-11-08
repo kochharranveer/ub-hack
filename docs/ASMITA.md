@@ -1,5 +1,7 @@
 # Asmita — Care hub / complete-function guide, revision 4
 
+> Current scope update: `/care` is now the patient-only Care Hub. Asmita is building a separate doctor portal. Clinician import, approval and acknowledgement APIs remain in Care, but their controls have been removed from this patient page. See [Patient Care Hub integration](PATIENT_CARE_HUB.md) for the shared database and API contract. Older instructions below describing a clinician toggle or a combined workspace are historical.
+
 Your app is `apps/care`, served at `/care`. You own the complete care-management loop: source document → reviewed draft → approved patient plan → checklist → clinician follow-through. You own its frontend, APIs, domain rules, persistence, validation and tests. **Ranveer now owns all Voice AI. Yuvraj owns all computer vision/exercise reports.**
 
 ## 1. Exact responsibilities
