@@ -1,164 +1,111 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useCompanion, type Phase } from "./use-companion";
-import styles from "./panda.module.css";
+import { useCompanion } from "./use-companion";
 import { approvedMedicationTasks } from "./today-actions";
-const labels: Record<Phase, string> = {
-  ready: "Ready when you are", listening: "Listening… tap to stop", thinking: "Thinking… tap to stop",
-  confirmation: "Review your action below", saving: "Saving… tap to stop waiting",
-  speech_loading: "Preparing audio… tap to stop", speaking: "Speaking… tap to stop",
-};
+import styles from "./panda.module.css";
+import RehabWorkspace from "../../../../packages/rehab-bridge/Workspace";
 function PandaFace() {
-  return <svg viewBox="0 0 120 108" aria-hidden="true">
-    <circle cx="29" cy="28" r="18" fill="var(--ink)" /><circle cx="91" cy="28" r="18" fill="var(--ink)" />
-    <ellipse cx="60" cy="59" rx="48" ry="43" fill="var(--card)" stroke="var(--line)" strokeWidth="2" />
-    <ellipse cx="40" cy="56" rx="13" ry="17" transform="rotate(25 40 56)" fill="var(--ink)" />
-    <ellipse cx="80" cy="56" rx="13" ry="17" transform="rotate(-25 80 56)" fill="var(--ink)" />
-    <circle cx="43" cy="54" r="4" fill="var(--card)" /><circle cx="77" cy="54" r="4" fill="var(--card)" />
-    <path d="M54 74 Q60 70 66 74 Q60 83 54 74 M60 80 Q52 89 48 82 M60 80 Q68 89 72 82" fill="var(--ink)" stroke="var(--ink)" strokeWidth="2" strokeLinecap="round" />
-  </svg>;
+  return <svg viewBox="0 0 120 108" aria-hidden="true"><circle cx="29" cy="28" r="18" fill="var(--ink)" /><circle cx="91" cy="28" r="18" fill="var(--ink)" /><ellipse cx="60" cy="59" rx="48" ry="43" fill="var(--card)" stroke="var(--line)" strokeWidth="2" /><ellipse cx="40" cy="56" rx="13" ry="17" transform="rotate(25 40 56)" fill="var(--ink)" /><ellipse cx="80" cy="56" rx="13" ry="17" transform="rotate(-25 80 56)" fill="var(--ink)" /><circle cx="43" cy="54" r="4" fill="var(--card)" /><circle cx="77" cy="54" r="4" fill="var(--card)" /><path d="M54 74 Q60 70 66 74 Q60 83 54 74 M60 80 Q52 89 48 82 M60 80 Q68 89 72 82" fill="var(--ink)" stroke="var(--ink)" strokeWidth="2" strokeLinecap="round" /></svg>;
 }
+function MicIcon() {
+  return <svg width="18" height="22" viewBox="0 0 24 26" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3" /><path d="M6 10v3a6 6 0 0 0 12 0v-3M12 19v5M8 24h8" /></svg>;
+}
+type Panel="medicines"|"memory"|"emergency"|null;
+type Mode="idle"|"voice"|"text";
 export default function Panda() {
-  const c = useCompanion();
-  const [typing, setTyping] = useState(false);
-  const [panel, setPanel] = useState<"voice" | "emergency" | null>(null);
-  const dialog = useRef<HTMLDialogElement>(null);
-  const composer = useRef<HTMLTextAreaElement>(null);
-  const active = !["ready", "confirmation"].includes(c.phase);
-  const medicines = approvedMedicationTasks(c.context);
-  const plan = c.context?.plan;
-  const engine = c.context?.aiEngine === "gemini" ? "Gemini" : c.context?.aiEngine === "openai" ? "OpenAI" : "Demo rules · no LLM";
-  useEffect(() => {
-    if (panel && !dialog.current?.open) dialog.current?.showModal();
-    if (!panel && dialog.current?.open) dialog.current?.close();
-  }, [panel]);
-  useEffect(() => { if (typing) composer.current?.focus(); }, [typing]);
+  const c=useCompanion();
+  const [panel,setPanel]=useState<Panel>(null),[mode,setMode]=useState<Mode>("idle");
+  const [exerciseOpen,setExerciseOpen]=useState(false),[directDraft,setDirectDraft]=useState(false);
+  const [remembered,setRemembered]=useState<Awaited<ReturnType<typeof c.rememberedContext>>|null>(null);
+  const [memoryError,setMemoryError]=useState("");
+  const dialog=useRef<HTMLDialogElement>(null),composer=useRef<HTMLTextAreaElement>(null);
+  const medicines=approvedMedicationTasks(c.context),plan=c.context?.plan,firstName=c.context?.patient?.firstName;
+  const active=!["ready","confirmation"].includes(c.phase);
+  const engine=c.reply?.engine==="checkin_workflow" ? "Guided check-in" : c.context?.aiEngine==="gemini" ? "Gemini" : c.context?.aiEngine==="openai" ? "OpenAI" : "Demo rules";
+  useEffect(()=>{
+    if(panel&&!dialog.current?.open)dialog.current?.showModal();
+    if(!panel&&dialog.current?.open)dialog.current?.close();
+  },[panel]);
+  useEffect(()=>{if(mode==="text")composer.current?.focus();},[mode,exerciseOpen]);
+  useEffect(()=>{if(!c.text)setDirectDraft(false);},[c.text]);
+  useEffect(()=>{
+    if(c.reply?.checkin?.stage==="exercise"&&c.reply.navigation==="/rehab")setExerciseOpen(true);
+    if(c.reply?.checkin&&["exercise_review","pain_check"].includes(c.reply.checkin.stage))setMode(current=>current==="idle"?"voice":current);
+  },[c.reply]);
   function talk() {
-    if (active) { c.stop(); return; }
-    if (!c.canMic) { setTyping(true); composer.current?.focus(); return; }
-    if (!c.micConsent) { setPanel("voice"); return; }
-    setTyping(true); c.mic();
+    setMode("voice");
+    if(exerciseOpen&&c.checkin&&c.checkin.stage!=="complete")c.listen();
+    else void c.activateVoice();
   }
-  function help() {
-    if (active) c.stop();
-    c.setText("I would like help from my care team. ");
-    setTyping(true);
-    composer.current?.focus();
+  function keyboard() {
+    c.stop();
+    if(mode==="text"){setMode("idle");return;}
+    setMode("text");
+    if(c.checkin?.stage!=="complete")void c.beginCheckin(false);
   }
-  function scheduleCheckIn() {
-    if (active) c.stop();
-    c.setText("I would like help scheduling a check-in with my care team.");
-    setTyping(true);
-    composer.current?.focus();
+  function prepare(text:string) {c.stop();c.setText(text);setDirectDraft(true);setMode("text");}
+  async function memoryPanel() {
+    setPanel("memory");setMemoryError("");
+    try{setRemembered(await c.rememberedContext());}catch(e){setMemoryError((e as Error).message);}
+  }
+  const voiceHeading=c.phase==="permission"?"Allow microphone access":c.phase==="listening"?"I’m listening":c.phase==="thinking"?"One moment":c.phase==="speaking"?"Panda is speaking":c.phase==="speech_loading"?"Preparing your reply":"Panda is here";
+  function confirmations() {
+    return c.reply?.proposalId ? <div className={styles.inlineConfirm}><button type="button" disabled={c.busy} onClick={()=>void c.confirm()}>{c.reply.mode==="fixture"?"Confirm dry run":"Confirm action"}</button><button type="button" className="secondary" disabled={c.busy} onClick={()=>void c.cancel()}>Dismiss</button></div>:null;
+  }
+  function replyText() {
+    return <div className={styles.inlineReply} role="status" aria-live="polite">
+      {c.busy&&<strong>{c.phase==="saving"?"Saving your choice…":"Thinking…"}</strong>}
+      {c.error?<p className="error">{c.error}</p>:c.reply?<p>{c.reply.message}</p>:<p>What’s on your mind?</p>}
+      {c.reply?.sourceRefs?.length?<small>Sources: {c.reply.sourceRefs.join(" · ")}</small>:null}
+    </div>;
+  }
+  function interaction() {
+    if(mode==="text")return <div className={styles.inlineText} aria-label="Text conversation">
+      {replyText()}{confirmations()}
+      <form onSubmit={event=>{event.preventDefault();void c.send(c.text,directDraft);}}>
+        <label className={styles.srOnly} htmlFor="message">Your message</label>
+        <textarea ref={composer} id="message" rows={2} value={c.text} maxLength={2000} placeholder="Type to Panda…" onChange={event=>c.setText(event.target.value)} />
+        <div className={styles.inlineSend}><small>{engine} · {c.checkin?.stage?.replaceAll("_"," ")??"patient context"}</small><button type="submit" disabled={c.busy||!c.text.trim()}>Send ↑</button></div>
+      </form>
+    </div>;
+    if(mode==="voice")return <div className={styles.inlineVoice} data-active={active} aria-label="Voice conversation">
+      <div className={styles.inlineOrb} aria-hidden="true" />
+      <h2>{voiceHeading}{c.phase==="listening"&&firstName?", "+firstName+"…":""}</h2>
+      {replyText()}{confirmations()}
+      <div className={styles.inlineVoiceControls}>
+        <button type="button" className="secondary" aria-label="End voice conversation" onClick={()=>{c.stop();setMode("idle");}}>×</button>
+        <button type="button" aria-label={active?"Stop voice activity":"Use microphone"} onClick={()=>active?c.stop():c.listen()}>{active?"■":<MicIcon />}</button>
+        <button type="button" className="secondary" aria-label="Play Panda reply" disabled={c.busy||!c.reply||(c.context?.ttsEngine==="elevenlabs"&&!c.speechConsent)} onClick={()=>void c.speak()}>▷</button>
+      </div>
+      <small className={styles.inlineCaption}>{engine} · {c.context?.ttsEngine==="elevenlabs"?"ElevenLabs":"browser voice"}</small>
+    </div>;
+    return <><button type="button" className={styles.panda} onClick={talk} aria-label="Talk to Panda"><span className={styles.face}><PandaFace /></span><small>Tap to talk to</small><strong>panda</strong><span className={styles.micMark} aria-hidden="true">◉</span></button>
+      {c.reply?.proposalId?<button type="button" className={styles.textButton} onClick={()=>setMode("text")}>Review pending action →</button>:<p className={styles.privacyCaption}>Voice uses browser speech{c.context?.sttConfigured?" or ElevenLabs transcription":""}.<br/>Check-in answers are remembered for this patient.</p>}
+    </>;
   }
   return <div className={styles.app}>
-    <div className={styles.topbar}>
-      <button type="button" className={styles.emergency} onClick={() => setPanel("emergency")}><span aria-hidden="true">＋</span> Emergency</button>
-      <a className={styles.brand} href="/" aria-label="Panda home">panda<span>care</span></a>
-      <button type="button" className={styles.careTeam} onClick={help}><span aria-hidden="true">↗</span> Care team</button>
-    </div>
-    <div className={styles.mode} role="status"><span className={styles.dot} />
-      {c.context ? c.context.mode === "fixture" ? "Fixture demo · actions are dry runs" : "Connected apps · synthetic demo" : "Loading your care context…"}
-    </div>
-    <section className={styles.greeting} aria-labelledby="welcome-title">
-      <h1 id="welcome-title">{c.context?.patient ? "Hey, " + c.context.patient.firstName + "." : "Hey there."}</h1>
-      <p>Let’s take today one step at a time.</p>
-    </section>
-    <section className={styles.today} aria-labelledby="today-title">
-      <div className={styles.sectionHeading}><h2 id="today-title">Today</h2><span className="pill">{plan ? "Approved plan · v" + plan.version : "No approved plan"}</span></div>
-      <ol className={styles.tasks}>
-        <li>
-          <span className={styles.taskNumber} aria-hidden="true">1</span>
-          <div><strong>Take medicines</strong>
-            {medicines.length ? <ul className={styles.medicines}>{medicines.map(task => <li key={task.id}>
-              <div><span>{task.title}</span><small>{task.status === "completed" ? "Completed · patient-reported" : "Exactly as listed in your approved plan"}</small></div>
-              {task.status === "pending" && <button type="button" className={styles.reportButton} disabled={c.busy} onClick={() => void c.send("Confirm task " + task.id)}>Report done</button>}
-            </li>)}</ul> : <small>{!c.context ? "Loading medicine details…" : "Medicine details pending in your approved plan."}</small>}
-          </div>
-          {!medicines.length && <a className={styles.actionLink} href="/care" onClick={c.stop}>View plan</a>}
-        </li>
-        <li>
-          <span className={styles.taskNumber} aria-hidden="true">2</span>
-          <div><strong>Exercise</strong><small>Open your demonstration exercise workspace.</small></div>
-          <a className={styles.actionLink} href="/rehab" onClick={c.stop}>Start ↗</a>
-        </li>
-        <li>
-          <span className={styles.taskNumber} aria-hidden="true">3</span>
-          <div><strong>Schedule check-in</strong><small>Request a time with your care team.<br />A request is not a booked appointment.</small></div>
-          <button type="button" className={styles.reportButton} disabled={c.busy || !plan || plan.status !== "approved"} onClick={scheduleCheckIn}>Request</button>
-        </li>
+    <div className={styles.topbar}><button type="button" onClick={()=>setPanel("emergency")}>＋ Emergency</button><a className={styles.brand} href="/" aria-label="Panda home">panda<span>care</span></a><button type="button" onClick={()=>prepare("I would like help from my care team. ")}>↗ Care team</button></div>
+    <div className={styles.mode} role="status"><span/>{c.context?c.context.mode==="fixture"?"Synthetic demo · dry runs only":"Connected apps · synthetic demo":c.error?"Care context unavailable":"Loading care context…"}</div>
+    <div className={styles.greeting}><h1>{firstName?"Hey, "+firstName+".":"Hey there."}</h1><p>Let’s take today one step at a time. <button type="button" className={styles.textButton} onClick={()=>void memoryPanel()}>My context</button></p></div>
+    <section className={styles.today} aria-labelledby="today-title"><div className={styles.sectionHeading}><h2 id="today-title">Today</h2><button type="button" className={styles.refresh} disabled={c.refreshing||c.busy} onClick={()=>void c.refresh()} aria-label="Refresh care status">↻ <span>Plan v{plan?.version??"—"}</span></button></div>
+      <ol className={styles.actions}>
+        <li><span className={styles.number}>1</span><div><strong>Take medicines</strong><small title={medicines[0]?.title}>{medicines.length?medicines[0].title:"Medicine details pending"}{medicines.length>1?" · +"+(medicines.length-1)+" more":""}</small></div><button type="button" onClick={()=>setPanel("medicines")}>View</button></li>
+        <li><span className={styles.number}>2</span><div><strong>Exercise</strong><small>Demonstration elbow movement</small></div><button type="button" disabled={c.busy||!plan} onClick={talk}>Start ↗</button></li>
+        <li><span className={styles.number}>3</span><div><strong>Follow-up check-in</strong><small>Doctor availability pending</small></div><button type="button" disabled title="Doctor availability is not connected yet">Pending</button></li>
       </ol>
-      <button className={styles.refresh} type="button" disabled={c.refreshing || c.busy} onClick={() => void c.refresh()}>{c.refreshing ? "Refreshing…" : "↻ Refresh care status"}</button>
     </section>
-    <section className={styles.voiceStage} aria-label="Talk to Panda">
-      <button className={styles.talk} type="button" data-active={active} aria-label={active ? "Stop current voice activity" : "Talk to Panda"} onClick={talk}>
-        <span className={styles.face}><PandaFace /></span>
-        <span className={styles.talkHint}>{c.phase === "listening" ? "I’m listening" : active ? "Tap to stop" : "Tap to talk to"}</span>
-        <strong>panda</strong>
-        <span className={styles.micIcon} aria-hidden="true">{active ? "■" : "◉"}</span>
-      </button>
-      <p className={styles.voiceStatus} role="status" aria-live="polite">{labels[c.phase]}</p>
-      <small className={styles.engine}>{engine}{c.context && !c.context.aiConfigured ? " · needs setup" : ""}</small>
-      {!c.canMic && <p className={styles.inputHint}>Speech isn’t supported here. Tap Panda or the keyboard to type.</p>}
-      <button type="button" className={styles.privacyButton} onClick={() => setPanel("voice")}>Voice permissions & privacy</button>
-    </section>
-    {c.notice && <p className={styles.notice} role="status">{c.notice}</p>}
-    {c.error && <div className={styles.error} role="alert"><strong>Let’s try that again.</strong><p>{c.error}</p><small>Retry the same confirmation if its result is uncertain.</small></div>}
-    {c.reply && <section className={styles.response} aria-label="Latest response">
-      <div className={styles.sectionHeading}><strong>Panda</strong><small>{c.reply.engine === "demo_rules" ? "Demo rules" : c.reply.engine} · {c.reply.mode}</small></div>
-      <p className={styles.reply}>{c.reply.message}</p>
-      {c.reply.sourceRefs?.length ? <small>Approved sources: {c.reply.sourceRefs.join(" · ")}</small> : null}
-      {c.reply.proposalId && <div className={styles.confirmation}>
-        <strong>Your choice. Your confirmation.</strong><p>{c.reply.mode === "fixture" ? "Dry run only. No Care record will change." : "Confirm to send this action to Care."} This proposal expires after 5 minutes.</p>
-        <button type="button" disabled={c.busy} onClick={() => void c.confirm()}>{c.reply.mode === "fixture" ? "Confirm dry run" : "Confirm this action"}</button>
-        <button type="button" className="secondary" disabled={c.busy} onClick={() => void c.cancel()}>Dismiss proposal</button>
-      </div>}
-      {c.reply.navigation && <a className="button" href={c.reply.navigation} onClick={c.stop}>Open exercise app →</a>}
-      <div className={styles.playback}>
-        <button type="button" className="secondary" disabled={c.busy || (c.context?.ttsEngine === "elevenlabs" && (!c.speechConsent || c.reply.message.length > 4000)) || (c.context?.ttsEngine !== "elevenlabs" && !c.canSpeak)} onClick={() => void c.speak()}>▷ Read aloud · {c.context?.ttsEngine === "elevenlabs" ? "ElevenLabs" : "browser"}</button>
-        {c.context?.ttsEngine === "elevenlabs" && <button type="button" className="secondary" disabled={c.busy || !c.canSpeak} onClick={() => void c.speak(true)}>Use browser speech</button>}
-        {c.context?.ttsEngine === "elevenlabs" && !c.context.ttsConfigured && <small>ElevenLabs needs server configuration. Choose browser speech when supported.</small>}
-        {c.context?.ttsEngine === "elevenlabs" && c.reply.message.length > 4000 && <small>Use browser speech for this longer reply.</small>}
-      </div>
+    <section className={styles.center} aria-label="Panda interaction">{!exerciseOpen&&interaction()}</section>
+    <nav className={styles.dock} aria-label="Companion navigation"><a href="/care" onClick={c.stop}><span aria-hidden="true">▤</span> My plan</a><button type="button" aria-label={mode==="text"?"Use microphone mode":"Use keyboard"} onClick={keyboard}>{mode==="text"?<MicIcon />:<span aria-hidden="true">⌨</span>}{mode==="text"?"Microphone":"Keyboard"}</button></nav>
+    {exerciseOpen&&<section className={styles.exerciseShell} aria-label="Exercise with Panda">
+      <div className={styles.exerciseHeader}><strong>Exercise · Panda stays with you</strong><button type="button" className="secondary" onClick={()=>{c.stop();setExerciseOpen(false);}}>Exit exercise</button></div>
+      <RehabWorkspace onEvent={c.exerciseFeedback} resumeSessionId={c.reply?.exerciseSessionId} onAskPanda={talk}/>
+      <div className={styles.exerciseInline}><div className={styles.exerciseInlineTop}><strong>Panda · {c.checkin?.stage?.replaceAll("_"," ")}</strong><button type="button" className="secondary" onClick={keyboard}>{mode==="text"?<MicIcon/>:"⌨"}</button><button type="button" className="secondary" onClick={()=>void c.retryFeedback()}>Sync</button></div>{interaction()}</div>
     </section>}
-    {typing && <form id="text-composer" className={styles.composer} onSubmit={e => { e.preventDefault(); void c.send(); }}>
-      <div className={styles.sectionHeading}><label htmlFor="message">Type to Panda</label><button type="button" className={styles.closeComposer} onClick={() => setTyping(false)} aria-label="Hide keyboard input">×</button></div>
-      <textarea ref={composer} id="message" value={c.text} maxLength={2000} rows={3} placeholder="What’s on your mind?" onChange={e => c.setText(e.target.value)} aria-describedby="input-hint" />
-      <div className={styles.composeActions}><small id="input-hint">Review your words.<br />Nothing is sent until you choose Send.</small><button type="submit" disabled={c.busy || !c.text.trim()}>Send ↑</button></div>
-    </form>}
-    <div className={styles.quickActions} aria-label="Suggested questions">
-      <button type="button" className="secondary" disabled={c.busy} onClick={() => void c.send("Show my plan")}>Read my plan</button>
-      <button type="button" className="secondary" disabled={c.busy} onClick={() => void c.send("Open exercise")}>Start exercise ↗</button>
-    </div>
-    {c.context?.help.length ? <section className={styles.helpStatus}><h2>Care team requests</h2>
-      {c.context.help.slice(-3).map(item => <div key={item.id}><p>“{item.quote}”</p><span className="pill">{item.status === "acknowledged" ? "Acknowledged by clinician" : "Recorded · awaiting acknowledgement"}</span></div>)}
-      <a href="/care" onClick={c.stop}>Check care status →</a>
-    </section> : null}
-    {c.history.length > 0 && <details className={styles.history}><summary>Conversation · {c.history.length} saved turns</summary>
-      <ol>{c.history.map(turn => <li key={turn.requestId}><span className="eyebrow">You</span><p>{turn.text}</p><span className="eyebrow">Panda</span><p>{turn.reply.message}</p></li>)}</ol>
-      <small>Last 50 turns within 24 hours. Expired records are removed on next access or maintenance.</small>
-    </details>}
-    <p className={styles.disclosure}>Synthetic patient · Demo identities<br />Help is recorded for separate acknowledgement. No emergency dispatch or automatic treatment changes.</p>
-    <nav className={styles.dock} aria-label="Companion navigation">
-      <a href="/care" onClick={c.stop}><span aria-hidden="true">▤</span><div>My plan<small>Plan & checklist</small></div></a>
-      <button type="button" aria-expanded={typing} aria-controls="text-composer" onClick={() => { setTyping(value => !value); if (!typing) composer.current?.focus(); }}><span aria-hidden="true">⌨</span><div>Keyboard<small>Type instead</small></div></button>
-    </nav>
-    <dialog ref={dialog} className={styles.dialog} aria-labelledby="dialog-title" onCancel={e => { e.preventDefault(); setPanel(null); }}>
-      <button type="button" className={styles.dialogClose} aria-label="Close dialog" onClick={() => setPanel(null)}>×</button>
-      {panel === "emergency" ? <>
-        <span className="eyebrow">Emergency information</span><h2 id="dialog-title">Panda cannot call for help.</h2>
-        <p>This demonstration is not monitored and cannot contact emergency services. If you need urgent help, contact your local emergency services directly.</p>
-        <p>Care requests here are recorded for later acknowledgement. They are not an emergency response.</p>
-        <button type="button" onClick={() => setPanel(null)}>Understood</button>
-      </> : <>
-        <span className="eyebrow">You’re in control</span><h2 id="dialog-title">Choose how we talk.</h2>
-        <label><input type="checkbox" checked={c.micConsent} onChange={e => c.changeMicConsent(e.target.checked)} /> Allow browser speech recognition. Your browser may send audio to its speech service.</label>
-        {!c.canMic && <p>Speech recognition is unavailable in this browser or connection. The keyboard works with the same actions.</p>}
-        {c.context?.ttsEngine === "elevenlabs" && <label><input type="checkbox" checked={c.speechConsent} onChange={e => c.changeSpeechConsent(e.target.checked)} /> Allow response text to be sent to ElevenLabs when I choose Read aloud.</label>}
-        <p>{engine} routes messages using your approved plan and current tasks. Microphone transcripts are drafts for you to review. Voice stops when you hide or leave this page.</p>
-        <button type="button" disabled={!c.canMic || !c.micConsent || c.busy} onClick={() => { setPanel(null); setTyping(true); c.mic(); }}>Start listening</button>
-        <button type="button" className="secondary" onClick={() => { setPanel(null); setTyping(true); }}>Use keyboard</button>
-      </>}
+    <dialog ref={dialog} className={styles.dialog} aria-labelledby="dialog-title" onCancel={event=>{event.preventDefault();setPanel(null);}}>
+      <button type="button" className={styles.dialogClose} aria-label="Close dialog" onClick={()=>setPanel(null)}>×</button>
+      {panel==="emergency"?<><span className="eyebrow">Emergency information</span><h2 id="dialog-title">Panda cannot call for help.</h2><p>This demonstration is not monitored and cannot contact emergency services. For urgent help, contact your local emergency services directly.</p><p>Care requests are recorded for separate acknowledgement.</p></>:
+        panel==="memory"?<><span className="eyebrow">Patient-scoped memory</span><h2 id="dialog-title">What Panda remembers</h2><p>Check-in answers remain until explicitly deleted. Plans and exercise reports remain in their own apps.</p>{memoryError&&<p role="alert">{memoryError}</p>}{!remembered?<p>Loading…</p>:<><small>{remembered.totalEvents} remembered entries · current patient only</small>{remembered.events.map(entry=><div className={styles.memoryEntry} key={entry.id}><small>{entry.kind.replaceAll("_"," ")} · {entry.at}</small><p>{entry.quote}</p><small>{entry.source.replaceAll("_"," ")}</small></div>)}{!remembered.events.length&&<p>No check-in answers yet.</p>}</>}</>:
+        <><span className="eyebrow">Approved plan · v{plan?.version??"—"}</span><h2 id="dialog-title">Your medicines</h2>{medicines.length?medicines.map(task=><div className={styles.medicine} key={task.id}><p>{task.title}</p><small>{task.status==="completed"?"Completed · patient-reported":"Exact text from the approved demonstration plan"}</small>{task.status==="pending"&&<button type="button" disabled={c.busy} onClick={()=>{setPanel(null);setMode("text");void c.send("Confirm task "+task.id,true);}}>Report done</button>}</div>):<p>Medicine details are not available in your approved plan yet.</p>}<a className="button secondary" href="/care" onClick={c.stop}>Open full plan</a><small className={styles.finePrint}>Synthetic examples only.</small></>}
     </dialog>
   </div>;
 }

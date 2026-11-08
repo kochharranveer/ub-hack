@@ -18,6 +18,11 @@ export function rehabService(file = dataFile("rehab")) {
     receipts: Record<string, Receipt>;
   }>(file, () => ({ sessions: [], receipts: {} }));
   return {
+    async session(id: string) {
+      const session=(await db.snapshot()).sessions.find(session=>session.id===id);
+      if (!session) throw new DomainError("NOT_FOUND","Exercise session not found",404);
+      return session;
+    },
     async reports() {
       return (await db.snapshot()).sessions.flatMap((s) =>
         s.report ? [s.report] : [],

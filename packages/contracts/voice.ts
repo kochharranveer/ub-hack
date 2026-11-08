@@ -1,5 +1,6 @@
 import { z } from "zod";
 export const VoiceCommandSchema = z.discriminatedUnion("name", [
+  z.object({ name: z.literal("read_patient_context"), args: z.object({ topic: z.enum(["all", "food", "medications", "exercise", "checkins"]) }).strict() }).strict(),
   z
     .object({ name: z.literal("read_plan"), args: z.object({}).strict() })
     .strict(),
@@ -36,11 +37,13 @@ export const ConfirmVoiceSchema = z
 export type VoiceCommand = z.infer<typeof VoiceCommandSchema>;
 export type VoiceReply = {
   mode: "fixture" | "connected";
-  engine: "demo_rules" | "openai" | "gemini";
+  engine: "demo_rules" | "openai" | "gemini" | "checkin_workflow";
   message: string;
   proposalId?: string;
   navigation?: "/rehab";
   sourceRefs?: string[];
+  checkin?: { id: string; stage: "medications" | "medication_confirmation" | "food" | "readiness" | "exercise" | "exercise_review" | "pain_check" | "help_confirmation" | "complete" };
+  exerciseSessionId?: string;
 };
 // Additive Panda-only endpoint types; Care/Rehab v2 shapes remain unchanged.
 export type VoiceContext = {
@@ -53,6 +56,7 @@ export type VoiceContext = {
   aiConfigured: boolean;
   ttsEngine: "browser" | "elevenlabs";
   ttsConfigured: boolean;
+  sttConfigured?: boolean;
 };
 export type VoiceHistoryTurn = {
   requestId: string; text: string; reply: VoiceReply; at: string;

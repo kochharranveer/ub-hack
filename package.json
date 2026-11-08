@@ -21,7 +21,8 @@
     "test:integration": "node scripts/integration.mjs",
     "test:providers:live": "node --import tsx scripts/provider-smoke.mjs",
     "voice:purge": "node --import tsx scripts/voice-purge.mjs",
-    "seed:demo": "node scripts/generate-demo-patients.mjs"
+    "seed:demo": "node scripts/generate-demo-patients.mjs",
+    "doctor": "node scripts/doctor.mjs"
   },
   "dependencies": {
     "next": "16.4.5",

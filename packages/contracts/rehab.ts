@@ -54,12 +54,8 @@ export const FinishSessionSchema = z
   .object({ requestId: z.string().min(8), report: ReportSchema })
   .strict();
 export type ExerciseReport = z.infer<typeof ReportSchema>;
-export type Session = {
-  id: string;
-  patientId: string;
-  planId: string;
-  planVersion: number;
-  exerciseId: "demo-elbow";
-  startedAt: string;
-  report: ExerciseReport | null;
-};
+export const SessionSchema = z.object({
+  id:z.string(),patientId:z.string(),planId:z.string(),planVersion:z.number().int().positive(),
+  exerciseId:z.literal("demo-elbow"),startedAt:z.string().datetime(),report:ReportSchema.nullable(),
+}).strict();
+export type Session = z.infer<typeof SessionSchema>;

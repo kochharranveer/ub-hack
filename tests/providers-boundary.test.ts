@@ -26,7 +26,7 @@ test("Gemini request uses server header, allowlisted schemas and a bounded signa
     assert.equal(new Headers(options?.headers).get("x-goog-api-key"), "fake-secret");
     const body = JSON.parse(String(options?.body));
     assert.deepEqual(body.tools[0].functionDeclarations.map((t: { name: string }) => t.name).sort(),
-      ["confirm_task", "open_exercise", "read_plan", "request_help"]);
+      ["confirm_task", "open_exercise", "read_patient_context", "read_plan", "request_help"]);
     assert.ok(body.tools[0].functionDeclarations.every((t: { parametersJsonSchema: { additionalProperties: boolean } }) => t.parametersJsonSchema.additionalProperties === false));
     assert.ok(options?.signal);
     return Response.json({ candidates: [{ content: { parts: [{ functionCall: { name: "read_plan", args: {} } }] } }] });

@@ -221,6 +221,42 @@ try {
     400,
   );
   checks++;
+
+  // Full guided check-in on fresh synthetic v3 data, including the persistent Rehab bridge.
+  const guidedDraft=await api("/care/api/plans/import",{requestId:"guided-plan-import",sourceText:"Medicine: Atorvastatin 10 mg, 1 tablet at 8 PM. Synthetic example.\nExercise: demonstration elbow movement.\nSchedule a follow-up request."});
+  const guidedPlan=await api("/care/api/plans/"+guidedDraft.id+"/approve",{requestId:"guided-plan-approve",expectedCurrentVersion:2});
+  let guided=await api("/api/voice/checkin/start",{requestId:"guided-start"});
+  assert.equal(guided.checkin.stage,"medications");
+  guided=await api("/api/voice/checkin/answer",{requestId:"guided-med",checkinId:guided.checkin.id,expectedStage:guided.checkin.stage,text:"Yes"});
+  assert.ok(guided.proposalId);
+  assert.equal((await api("/care/api/state")).tasks[0].status,"pending");
+  checks++;
+  await api("/api/voice/confirm",{proposalId:guided.proposalId});
+  guided=await api("/api/voice/checkin/continue",{requestId:"guided-med-continue",checkinId:guided.checkin.id,proposalId:guided.proposalId});
+  assert.equal(guided.checkin.stage,"food");checks++;
+  guided=await api("/api/voice/checkin/answer",{requestId:"guided-food",checkinId:guided.checkin.id,expectedStage:guided.checkin.stage,text:"Oatmeal and a banana"});
+  assert.equal(guided.checkin.stage,"readiness");
+  assert.match(guided.message,/availability is pending/);checks++;
+  guided=await api("/api/voice/checkin/answer",{requestId:"guided-ready",checkinId:guided.checkin.id,expectedStage:guided.checkin.stage,text:"Yes"});
+  assert.equal(guided.checkin.stage,"exercise");checks++;
+  const guidedSession=await api("/rehab/api/sessions",{requestId:"guided-session",planId:guidedPlan.id,planVersion:guidedPlan.version,exerciseId:"demo-elbow"});
+  assert.equal((await api("/rehab/api/sessions/"+guidedSession.id)).patientId,initial.patientId);
+  await api("/api/voice/exercise-feedback",{requestId:"guided-start-feedback",checkinId:guided.checkin.id,event:{version:"1.0.0",type:"session_started",sessionId:guidedSession.id,planId:guidedSession.planId,planVersion:guidedSession.planVersion}});
+  checks++;
+  await api("/rehab/api/sessions/"+guidedSession.id+"/finish",{requestId:"guided-finish",report:{
+    ...report,sessionId:guidedSession.id,patientId:guidedSession.patientId,planId:guidedSession.planId,planVersion:guidedSession.planVersion,startedAt:guidedSession.startedAt,endedAt:new Date().toISOString(),
+  }});
+  guided=await api("/api/voice/exercise-feedback",{requestId:"guided-report-feedback",checkinId:guided.checkin.id,event:{version:"1.0.0",type:"report_saved",sessionId:guidedSession.id}});
+  assert.equal(guided.checkin.stage,"exercise_review");assert.match(guided.message,/simulated/);checks++;
+  guided=await api("/api/voice/checkin/answer",{requestId:"guided-review",checkinId:guided.checkin.id,expectedStage:guided.checkin.stage,text:"My arm felt tired."});
+  assert.equal(guided.checkin.stage,"pain_check");
+  guided=await api("/api/voice/checkin/answer",{requestId:"guided-pain",checkinId:guided.checkin.id,expectedStage:guided.checkin.stage,text:"No pain or discomfort"});
+  assert.equal(guided.checkin.stage,"complete");checks++;
+  const memory=await api("/api/voice/memory");
+  assert.equal(memory.retention,"until_deleted");
+  assert.ok(memory.events.some(event=>event.kind==="food" && event.quote==="Oatmeal and a banana"));
+  assert.ok(memory.events.some(event=>event.kind==="exercise_report" && event.source==="rehab_report"));checks++;
+
   console.log(
     `PASS: ${checks} integrated checks across three built apps, one gateway origin, versioned plans, voice confirmation, reports, acknowledgement and assets.`,
   );

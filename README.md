@@ -22,7 +22,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open **http://localhost:3000**. `/` is Ranveer's app; `/care` and `/rehab` are proxied to the other two Next.js apps, including their assets and API routes. Use ordinary anchor navigation between zones. All apps remain separate build/deployment units; no copying React components between them, no iframes, no fourth product app.
+Open **http://localhost:3000**. `/` is Ranveer's app; `/care` and `/rehab` are proxied to the other two Next.js apps, including their assets and API routes. Use ordinary anchor navigation between zones. The guided exercise flow embeds the single shared Rehab workspace to preserve Panda audio; standalone Rehab reuses that same component. Domain APIs/stores remain separate. See [continuous check-in integration](docs/VOICE_CHECKIN.md).
 
 A shared [12-patient synthetic dataset](docs/SYNTHETIC_PATIENTS.md) supplies the demo, with Alex active by default. Defaults need no keys. Connected mode uses real local inter-app HTTP, voice-owned SQLite, and Care/Rehab JSON-file persistence; it does not mean connected to a real clinic. Browser microphone support varies; text is always available.
 
@@ -47,16 +47,16 @@ For cross-app navigation and integration, use `npm run dev` and port 3000. Stand
 - Patient-reported task confirmation with revision checks; help recording and separate clinician acknowledgement.
 - Voice command tool dispatcher, server-persisted proposals, explicit user confirmation, idempotent writes through Care APIs.
 - Optional Gemini/OpenAI intent-routing adapters; optional ElevenLabs speech adapter. All secrets stay server-side.
-- Browser speech recognition where available, with consent; browser read-aloud fallback and text input.
+- Same-page voice/text switching, persistent patient context and guided check-ins. Browser speech recognition or ElevenLabs recorded STT; TTS/read-aloud and stop cleanup.
 - Camera preview/lifecycle, start/finish session APIs, immutable saved reports and report acknowledgement through Care.
 - A clearly labelled simulated exercise report for verifying integration; it is not measured camera progress.
 - Local persistence, runtime contract validation, domain tests and an integration test against all three production builds.
 
 ## Work still to build
 
-**This is a working integration starter, not the completed care product.** Real pose inference/calibration/rep counting is Yuvraj's first major task. PDF/OCR extraction is pending. Paid AI/speech calls are wired but were not tested with real credentials; browser microphone/camera behavior needs actual-device testing. Full-duplex ElevenLabs Agents is an optional upgrade; the supplied speech adapter is text-to-speech, not a realtime agent.
+**This is a working integration starter, not the completed care product.** Real pose inference/calibration/rep counting is Yuvraj's first major task. PDF/OCR extraction is pending. Gemini routing/memory retrieval and ElevenLabs TTS/STT passed live API checks using synthetic data; browser microphone/camera behavior and human audio playback need actual-device testing. Full-duplex ElevenLabs Agents is an optional upgrade; the supplied speech flow uses separate STT/model/TTS turns, not a realtime agent.
 
-Identities are fixed synthetic demo identities. There is no real authentication/authorization, patient isolation, durable production database, production job runner, actual clinician delivery, EHR connection, appointments, outbound calls, wearables, caregiver sharing, PWA/offline support or native app. A local JSON store supports one server process per app and is unsuitable for serverless replicas. Do not publish this demo with real patient data or paid unauthenticated endpoints.
+Identities are fixed synthetic demo identities. Patient-scoped local repositories are tested, but there is no real authentication/authorization or durable production database, production job runner, actual clinician delivery, EHR connection, appointments, outbound calls, wearables, caregiver sharing, PWA/offline support or native app. A local JSON store supports one server process per app and is unsuitable for serverless replicas. Do not publish this demo with real patient data or paid unauthenticated endpoints.
 
 ## Optional AI and speech configuration
 
@@ -65,6 +65,7 @@ Edit root `.env.local`; the root runner loads it for all apps. Never use `NEXT_P
 - Gemini track: `PANDA_AI_MODE=gemini`, `PANDA_GEMINI_API_KEY`, `PANDA_GEMINI_MODEL` (an available model ID, without `models/`).
 - Optional OpenAI alternative: `PANDA_AI_MODE=openai`, `PANDA_OPENAI_API_KEY`, `PANDA_OPENAI_MODEL`.
 - ElevenLabs track: `PANDA_TTS_MODE=elevenlabs`, `PANDA_ELEVENLABS_API_KEY`, `PANDA_ELEVENLABS_VOICE_ID`, `PANDA_ELEVENLABS_MODEL_ID`.
+- Recorded STT fallback: `PANDA_STT_MODEL=scribe_v2` by default, using the same server-side ElevenLabs key.
 - No credentials: `PANDA_AI_MODE=demo`, `PANDA_TTS_MODE=browser`; the UI labels demo rules and browser speech.
 
 Configured provider failures surface as failures; they never silently turn into a successful mock. Use synthetic data for external-provider tests. Model availability and account access must be checked in your own provider account.

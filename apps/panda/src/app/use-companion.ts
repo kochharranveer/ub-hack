@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { recordedRecognition } from "./recorded-recognition";
 import type { VoiceContext, VoiceHistoryTurn, VoiceReply } from "@contracts";
+import type { CheckinSession, RehabBridgeEvent } from "../../../../packages/contracts/checkin";
 
-export type Phase = "ready" | "listening" | "thinking" | "confirmation" | "saving" | "speech_loading" | "speaking";
+export type Phase = "permission" | "ready" | "listening" | "thinking" | "confirmation" | "saving" | "speech_loading" | "speaking";
 type Recognition = {
   lang: string; continuous: boolean; interimResults: boolean;
   onresult: ((e: { results: { [key: number]: { [key: number]: { transcript: string } } } }) => void) | null;
@@ -35,9 +37,17 @@ export function useCompanion() {
   const [notice, setNotice] = useState("");
   const [micConsent, setMicConsent] = useState(false);
   const [speechConsent, setSpeechConsent] = useState(false);
+  const micConsentRef=useRef(false),speechConsentRef=useRef(false);
   const [canMic, setCanMic] = useState(false);
   const [canSpeak, setCanSpeak] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [checkin, setCheckin] = useState<VoiceReply["checkin"]>();
+  const checkinRef=useRef<VoiceReply["checkin"]>(undefined);
+  const startAttempt=useRef<{requestId:string}|null>(null);
+  const continueAttempt=useRef<{requestId:string;checkinId:string;proposalId:string}|null>(null);
+  const handsfree=useRef(false);
+  const feedbackQueue=useRef<{requestId:string;checkinId:string;event:RehabBridgeEvent}[]>([]);
+  const flushingFeedback=useRef(false);
   const live = useRef(true);
   const generation = useRef(0);
   const soundGeneration = useRef(0);
@@ -47,7 +57,7 @@ export function useCompanion() {
   const audioUrl = useRef<string | null>(null);
   const speechAbort = useRef<AbortController | null>(null);
   const requests = useRef(new Set<AbortController>());
-  const pending = useRef<{ requestId: string; text: string } | null>(null);
+  const pending = useRef<{ requestId: string; text: string; route:string; checkinId?:string; expectedStage?:string } | null>(null);
   const inFlight = useRef(false);
   const settledPhase = () => latestReply.current?.proposalId ? "confirmation" as const : "ready" as const;
 
@@ -70,6 +80,7 @@ export function useCompanion() {
     window.speechSynthesis?.cancel();
   }
   function cleanup() {
+    handsfree.current=false;
     generation.current++;
     stopMic(); stopSound();
     for (const controller of requests.current) controller.abort();
@@ -87,6 +98,7 @@ export function useCompanion() {
   }
   function acceptReply(value: VoiceReply) {
     latestReply.current = value; setReply(value);
+    if (value.checkin) {checkinRef.current=value.checkin;setCheckin(value.checkin);}
     setPhase(value.proposalId ? "confirmation" : "ready");
   }
   async function request<T>(route: string, body?: unknown): Promise<T> {
@@ -105,6 +117,10 @@ export function useCompanion() {
     catch (e) { if (live.current && (e as Error).name !== "AbortError") setError((e as Error).message); }
     finally { if (live.current) setRefreshing(false); }
   }
+  useEffect(()=>{
+    setCanMic(window.isSecureContext && Boolean((window as SpeechWindow).SpeechRecognition || (window as SpeechWindow).webkitSpeechRecognition ||
+      (context?.sttConfigured && "MediaRecorder" in window && navigator.mediaDevices?.getUserMedia)));
+  },[context?.sttConfigured]);
   useEffect(() => {
     live.current = true;
     const initGeneration = generation.current;
@@ -114,6 +130,7 @@ export function useCompanion() {
       const results = await Promise.allSettled([
         loadContext(),
         request<VoiceHistoryTurn[]>("voice/history"),
+        request<{checkin:CheckinSession|null}>("voice/memory"),
       ]);
       if (!live.current || initGeneration !== generation.current) return;
       const past = results[1];
@@ -121,6 +138,10 @@ export function useCompanion() {
         setHistory(past.value);
         const last = past.value.at(-1)?.reply;
         if (last) acceptReply(last);
+      }
+      const remembered=results[2];
+      if (remembered.status==="fulfilled" && remembered.value.checkin && remembered.value.checkin.stage!=="complete") {
+        checkinRef.current={id:remembered.value.checkin.id,stage:remembered.value.checkin.stage};setCheckin(checkinRef.current);
       }
       const failed = results.find(r => r.status === "rejected" && r.reason?.name !== "AbortError");
       if (failed?.status === "rejected") setError(failed.reason.message);
@@ -144,30 +165,34 @@ export function useCompanion() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function send(value = text) {
+  async function send(value = text, direct = false) {
     if (!value.trim() || value.length > 2000 || inFlight.current) return;
     stopMic(); stopSound();
     inFlight.current = true;
     const run = ++generation.current;
     setPhase("thinking"); setError(""); setNotice("");
-    if (pending.current?.text !== value) pending.current = { requestId: crypto.randomUUID(), text: value };
+    const activeCheckin=!direct && checkinRef.current && checkinRef.current.stage!=="complete" ? checkinRef.current : undefined;
+    const route=activeCheckin ? "voice/checkin/answer" : "voice/turn";
+    if (pending.current?.text !== value || pending.current.route!==route) pending.current = { requestId: crypto.randomUUID(), text: value, route, ...(activeCheckin ? {checkinId:activeCheckin.id,expectedStage:activeCheckin.stage} : {}) };
     const input = pending.current;
     try {
-      const result = await request<VoiceReply>("voice/turn", input);
+      const {route:target,...payload}=input;
+      const result = await request<VoiceReply>(target, payload);
       if (!live.current || run !== generation.current) return;
       pending.current = null;
       inFlight.current = false;
       acceptReply(result);
       setText("");
+      if (handsfree.current) void speak();
       setHistory(items => [...items.filter(i => i.requestId !== input.requestId), {
-        ...input, reply: result, at: new Date().toISOString(),
+        requestId:input.requestId,text:input.text,reply: result, at: new Date().toISOString(),
       }].slice(-50));
       try { await loadContext(); }
       catch (e) { if ((e as Error).name !== "AbortError" && run === generation.current) setError("Reply saved. Context refresh failed: " + (e as Error).message); }
     } catch (e) {
       if (live.current && run === generation.current) { setPhase(settledPhase()); setError((e as Error).message); }
     } finally {
-      if (run === generation.current) inFlight.current = false;
+      if (run === generation.current) {inFlight.current = false;if (feedbackQueue.current.length) void flushFeedback();}
     }
   }
   async function resolveProposal(action: "confirm" | "cancel") {
@@ -178,11 +203,18 @@ export function useCompanion() {
     const run = ++generation.current;
     setPhase("saving"); setError(""); setNotice("");
     try {
-      const result = await request<VoiceReply>("voice/" + action, { proposalId });
+      let result = await request<VoiceReply>("voice/" + action, { proposalId });
+      const current=checkinRef.current;
+      if (current && ["medication_confirmation","help_confirmation"].includes(current.stage)) {
+        if (continueAttempt.current?.proposalId!==proposalId) continueAttempt.current={requestId:crypto.randomUUID(),checkinId:current.id,proposalId};
+        result=await request<VoiceReply>("voice/checkin/continue",continueAttempt.current);
+        continueAttempt.current=null;
+      }
       if (!live.current || run !== generation.current) return;
       inFlight.current = false;
       acceptReply(result);
       setHistory(items => items.map(i => i.reply.proposalId === proposalId ? { ...i, reply: result } : i));
+      if (handsfree.current) void speak();
       try { await loadContext(); }
       catch (e) { if ((e as Error).name !== "AbortError" && run === generation.current) setError("Action result received. Refresh Care status: " + (e as Error).message); }
     } catch (e) {
@@ -194,20 +226,28 @@ export function useCompanion() {
       } else setPhase("confirmation");
       setError(err.message);
     } finally {
-      if (run === generation.current) inFlight.current = false;
+      if (run === generation.current) {inFlight.current = false;if (feedbackQueue.current.length) void flushFeedback();}
     }
   }
   function mic() {
     const Ctor = (window as SpeechWindow).SpeechRecognition || (window as SpeechWindow).webkitSpeechRecognition;
-    if (!Ctor || !micConsent || !canMic || inFlight.current) return;
+    if (!micConsentRef.current || !canMic || inFlight.current) return;
     stopMic(); stopSound(); setError(""); setNotice("");
-    const rec = new Ctor();
+    const rec = Ctor ? new Ctor() : recordedRecognition(async(blob,signal)=>{
+      const form=new FormData();form.set("file",blob,"microphone.webm");
+      const response=await fetch("/api/voice/transcribe",{method:"POST",body:form,signal});
+      const out=await response.json();
+      if(!response.ok||!out.ok)throw Error(out.error?.message||"Transcription unavailable");
+      return out.data.text as string;
+    },()=>{if(live.current)setPhase("thinking");});
     recognition.current = rec;
     rec.lang = "en-US"; rec.continuous = false; rec.interimResults = false;
     rec.onresult = e => {
       if (recognition.current !== rec || !live.current) return;
-      setText(e.results[0][0].transcript);
-      setNotice("Transcript ready. Review it, then choose Send.");
+      const transcript=e.results[0][0].transcript;
+      setText(transcript);
+      if (handsfree.current) void send(transcript);
+      else setNotice("Transcript ready. Review it, then choose Send.");
     };
     rec.onerror = e => {
       if (recognition.current !== rec || !live.current) return;
@@ -227,19 +267,22 @@ export function useCompanion() {
     stopMic(); stopSound(); setError(""); setNotice("");
     const token = soundGeneration.current;
     const done = () => {
-      if (live.current && token === soundGeneration.current) { stopSound(); setPhase(settledPhase()); }
+      if (live.current && token === soundGeneration.current) {
+        stopSound(); setPhase(settledPhase());
+        if (handsfree.current && !latestReply.current?.proposalId && checkinRef.current && checkinRef.current.stage!=="complete") mic();
+      }
     };
     if (browserFallback || context?.ttsEngine !== "elevenlabs") {
       if (!window.speechSynthesis) { setError("Browser speech is unavailable. You can read the response above."); return; }
       const utterance = new SpeechSynthesisUtterance(message);
       utterance.onend = done;
       utterance.onerror = () => {
-        if (live.current && token === soundGeneration.current) { setError("Browser speech could not play. Text remains available."); done(); }
+        if (live.current && token === soundGeneration.current) { handsfree.current=false;setError("Browser speech could not play. Text remains available."); done(); }
       };
       setPhase("speaking"); window.speechSynthesis.speak(utterance);
       return;
     }
-    if (!speechConsent) { setError("Enable speech consent before sending response text to ElevenLabs."); return; }
+    if (!speechConsentRef.current) { setError("Enable speech consent before sending response text to ElevenLabs."); return; }
     const controller = new AbortController();
     speechAbort.current = controller;
     setPhase("speech_loading");
@@ -258,26 +301,103 @@ export function useCompanion() {
       const player = new Audio(audioUrl.current);
       audio.current = player;
       player.onended = done;
-      player.onerror = () => { if (token === soundGeneration.current && live.current) { setError("Audio could not play. Try browser speech."); done(); } };
+      player.onerror = () => { if (token === soundGeneration.current && live.current) { handsfree.current=false;setError("Audio could not play. Try browser speech."); done(); } };
       await player.play();
       if (token === soundGeneration.current && live.current) setPhase("speaking");
     } catch (e) {
-      if (token === soundGeneration.current && live.current) { setError((e as Error).message); done(); }
+      if (token === soundGeneration.current && live.current) { handsfree.current=false;setError((e as Error).message); done(); }
     }
   }
+
+  async function beginCheckin(withVoice=false) {
+    if (inFlight.current) return;
+    stopMic(); stopSound(); inFlight.current=true;
+    const run=++generation.current;
+    setError("");setNotice("");setPhase("thinking");
+    startAttempt.current ??= {requestId:crypto.randomUUID()};
+    try {
+      const result=await request<VoiceReply>("voice/checkin/start",startAttempt.current);
+      if (!live.current || run!==generation.current) return;
+      startAttempt.current=null;
+      inFlight.current=false;
+      acceptReply(result);
+      handsfree.current=Boolean(withVoice && micConsentRef.current && canMic && (context?.ttsEngine!=="elevenlabs" || speechConsentRef.current));
+      if (handsfree.current) void speak();
+    } catch(e) {if (live.current && run===generation.current) {setError((e as Error).message);setPhase(settledPhase());}}
+    finally {if (run===generation.current) {inFlight.current=false;if (feedbackQueue.current.length) void flushFeedback();}}
+  }
+  async function flushFeedback() {
+    if (flushingFeedback.current || inFlight.current) return;
+    flushingFeedback.current=true;
+    try {
+      while (feedbackQueue.current.length && live.current) {
+        const item=feedbackQueue.current[0];
+        const result=await request<VoiceReply>("voice/exercise-feedback",item);
+        feedbackQueue.current.shift();
+        if (!live.current) break;
+        // Camera/tracking updates must not interrupt a patient mid-sentence.
+        if (item.event.type==="report_saved") {
+          stopMic();stopSound();acceptReply(result);
+          if (handsfree.current) void speak();
+        } else if (result.checkin) {checkinRef.current=result.checkin;setCheckin(result.checkin);}
+      }
+    } catch(e) {if (live.current) setError("Exercise is saved in Rehab, but Panda context sync needs a retry: "+(e as Error).message);}
+    finally {flushingFeedback.current=false;}
+  }
+  function exerciseFeedback(event:RehabBridgeEvent) {
+    const current=checkinRef.current;
+    if (!current) return;
+    feedbackQueue.current.push({requestId:crypto.randomUUID(),checkinId:current.id,event});
+    void flushFeedback();
+  }
+  async function rememberedContext() {return request<{patientId:string;retention:string;totalEvents:number;events:{id:string;kind:string;quote:string;at:string;source:string}[]}>("voice/memory");}
+
+
+  async function activateVoice() {
+    if (inFlight.current) return;
+    inFlight.current=true;
+    const token=++generation.current;
+    setError("");setNotice("");setPhase("permission");
+    let permissionStream:MediaStream|undefined;
+    try {
+      if (!canMic) throw Error("Speech recognition is unavailable in this browser. Use the keyboard button below.");
+      if (!micConsentRef.current && navigator.mediaDevices?.getUserMedia) {
+        permissionStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+        permissionStream.getTracks().forEach(track=>track.stop());permissionStream=undefined;
+      }
+      if (!live.current || token!==generation.current) return;
+      changeMicConsent(true);changeSpeechConsent(true);
+      inFlight.current=false;
+      await beginCheckin(true);
+    } catch(e) {
+      if (live.current && token===generation.current) {
+        handsfree.current=false;
+        setError((e as Error).name==="NotAllowedError" ? "Microphone permission was denied. Allow it in browser settings, or use the keyboard." : (e as Error).message);
+        setPhase(settledPhase());
+      }
+    } finally {
+      permissionStream?.getTracks().forEach(track=>track.stop());
+      if (token===generation.current) inFlight.current=false;
+    }
+  }
+  function listen() {
+    if (!micConsentRef.current || !canMic) {void activateVoice();return;}
+    handsfree.current=true;mic();
+  }
+
   function changeMicConsent(value: boolean) {
-    setMicConsent(value);
+    micConsentRef.current=value;setMicConsent(value);
     if (!value) { stopMic(); if (phase === "listening") setPhase(settledPhase()); }
   }
   function changeSpeechConsent(value: boolean) {
-    setSpeechConsent(value);
+    speechConsentRef.current=value;setSpeechConsent(value);
     if (!value) { stopSound(); if (phase === "speaking" || phase === "speech_loading") setPhase(settledPhase()); }
   }
   return {
-    context, history, reply, text, setText, phase, error, notice,
+    context, history, reply, text, setText, phase, error, notice, checkin,
     micConsent, speechConsent, canMic, canSpeak, refreshing,
     busy: phase === "thinking" || phase === "saving",
     refresh, send, confirm: () => resolveProposal("confirm"), cancel: () => resolveProposal("cancel"),
-    mic, speak, stop, changeMicConsent, changeSpeechConsent,
+    mic, listen, speak, stop, activateVoice, changeMicConsent, changeSpeechConsent, beginCheckin, exerciseFeedback, retryFeedback:flushFeedback, rememberedContext,
   };
 }

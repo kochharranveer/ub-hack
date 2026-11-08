@@ -10,7 +10,7 @@ Authoritative executable types: `packages/contracts/*.ts` (Zod validation). This
 | `/care/*` including `/care/api/*` | Care / Asmita | port 3001, Next basePath `/care` |
 | `/rehab/*` including `/rehab/api/*` | Rehab / Yuvraj | port 3002, Next basePath `/rehab` |
 
-Panda proxies Care/Rehab paths, including `_next` assets. The browser sees one origin. Server-to-server calls use private origins, bounded timeouts and `cache:no-store`. Never send server secrets in query strings or browser bundles. Use `<a>` for cross-zone navigation; a hard navigation intentionally unloads voice/camera resources. The MVP does not preserve a live voice connection across apps.
+Panda proxies Care/Rehab paths, including `_next` assets. The browser sees one origin. Server-to-server calls use private origins, bounded timeouts and `cache:no-store`. Never send server secrets in query strings or browser bundles. Use `<a>` for cross-zone navigation; a hard navigation intentionally unloads voice/camera resources. The guided check-in instead mounts the single shared Rehab workspace within Panda, preserving its voice hook through bridge1.0.0; standalone hard navigation still stops resources. See [VOICE_CHECKIN.md](VOICE_CHECKIN.md) for the additive routes and bridge.
 
 ## API catalog
 
@@ -42,7 +42,7 @@ IDs are opaque strings; do not parse the value to infer identity or authorizatio
 
 Each mutation has one stable UUID request ID and a fingerprint. Retry the SAME ID with the SAME full payload, including timestamps. Same ID/different input is a conflict. Server-issued voice proposal IDs double as downstream care request IDs. Proposals expire after five minutes and are invalidated by an intervening plan change. Never generate a fresh ID just because the response was lost.
 
-Voice tools are exactly `read_plan`, `confirm_task`, `request_help`, `open_exercise`. All model outputs are parsed against the allowlist. No arbitrary URLs, SQL, medication-changing or prescribing tools. Read-plan responses quote approved source lines; AI routes intent instead of inventing clinical advice. A write is a proposal until a separate explicit UI confirmation. Speech alone does not silently perform a clinical action.
+Voice tools are exactly `read_plan`, `read_patient_context`, `confirm_task`, `request_help`, `open_exercise`. All model outputs are parsed against the allowlist. No arbitrary URLs, SQL, medication-changing or prescribing tools. Read-plan responses quote approved source lines; AI routes intent instead of inventing clinical advice. A write is a proposal until a separate explicit UI confirmation. Speech alone does not silently perform a clinical action.
 
 Reports bind `sessionId`, `patientId`, `planId`, `planVersion`, `exerciseId` and `startedAt` to the captured Session. Finish cannot change those. Unavailable tracking requires zero reps and null range. Simulation must use BOTH `evidence:'simulated'` and `trackingQuality:'simulated'`; it cannot be passed off as camera measurement. Camera measurements are estimates, never proof of correct technique or clinical improvement. Report saving does not imply clinician acknowledgement.
 

@@ -1,22 +1,18 @@
 # Validation — November 7, 2026
 
-This records the Ranveer voice implementation on the v0.2 baseline. It is not clinical-product acceptance.
+Synthetic MVP verification; this is not clinical-product acceptance.
 
-- `npm ci`: passed using the supplied lockfile; no new package dependency.
-- `npm run check`: passed, with TypeScript across all three apps and **41 tests, zero failures**.
-- `npm run build`: all three apps built. Panda was rebuilt after the final UI, confirmation and adapter changes.
-- `npm run test:integration`: **19 gateway checks passed**, including no write before confirmation, stable retry, resolved history, dismissal, stale-plan rejection, report save/retry, help/report acknowledgement and app assets.
-- Panda, Care and Rehab each started independently and returned explicit fixture context.
-- Browser QA succeeded on the actual local app. Tested sourced plan replies, keyboard entry, explicit fixture confirmation, accurate dry-run wording, saved conversation after reload, Emergency information dialog, and 390-pixel layout with no horizontal overflow.
-- Screenshots accompany the delivery. Responsive browser sizing is not a physical-device test.
-- `npm run voice:purge`: correctly handles an absent database; repository tests cover pruning populated/expired records.
-- `npm run test:providers:live`: intentionally stopped with a missing-configuration message. **No paid provider call or actual microphone recording is claimed.**
-- Provider HTTP requests/responses, malformed JSON, schema violations, rejection, cancellation, timeout and speech-body failure were tested with mocked fetch responses.
-- Authentication, production PostgreSQL, HTTPS hosting, actual pose inference and real clinician delivery remain pending.
+- `npm run check`: TypeScript across three apps and **58 tests, zero failures**. Includes medication confirmation, food/context persistence, patient separation, recovery, stale-step protection, owner-verified exercise feedback, post-exercise review, pain proposals and transcription boundaries.
+- `npm run build`: all three apps passed; Panda rebuilt after the final inline UI and expired-confirmation recovery change.
+- `npm run test:integration`: **27 connected checks plus three standalone fixture checks passed**. Exercises the gateway, source/revision/idempotency rules and full check-in → report → review → permanent-memory flow.
+- Browser: keyboard replaces Panda inline; bottom button becomes microphone; switching back restores Panda without a dialog. The synthetic medication → food → readiness → embedded exercise → simulated report → feelings → pain review completed at the same URL. Desktop text mode had no document overflow. Earlier compact-home QA covered 390×844, 320×568, 844×390 and 1366×768; the final keyboard layout has not been verified on a physical phone.
+- Live Gemini: validated `read_plan` and `read_patient_context` responses using synthetic data.
+- Live ElevenLabs: generated a real MP3, then transcribed the synthetic audio successfully using `scribe_v2`. No actual microphone recording or human playback observation is claimed.
+- Mocked provider tests cover malformed output, extra arguments, rejection, timeout, cancellation and speech-body failures. Stop/abort release behavior includes a microphone stream arriving after cancellation.
+- Memory survives repository reopening, scopes records by patient, and has no automatic expiry. Short-lived voice records retain their separate 24-hour policy.
+- No new npm dependency. Existing lockfile used. Node 25.8.1/npm 11.11.0 locally; declared Node floor22.13 and CI Node24. GitHub-hosted CI has not been remotely observed.
 
-Local runtime used Node 25.8.1 and npm 11.11.0. The committed Node floor is 22.13; CI selects Node 24. GitHub-hosted CI was configured but not remotely run during this delivery.
-
-Reproduce from the repository root:
+Reproduce from repository root (stop servers on ports3000–3002 first):
 
 ```sh
 npm ci
@@ -25,8 +21,8 @@ npm run build
 npm run test:integration
 ```
 
-Stop other servers on ports 3000–3002 first. The integration runner isolates storage in temporary directories.
+The integration runner uses isolated temporary storage. Provider tests spend provider credits and must use synthetic inputs. Credentials stay in root `.env.local`, never source or evidence files.
 
-See [Ranveer's handoff](docs/RANVEER_HANDOFF.md) for payload examples, storage/retention semantics, live provider setup, teammate reviews and the remaining implementation checklist.
+Still pending: doctor availability/booking, real pose inference, actual microphone/camera/phone/background tests, human audio playback, teammate acceptance, production sign-in/authorization/quotas/database/HTTPS, EHR/CRM integration, medical-reference grounding and clinician-reviewed medical-answer evaluations. No clinical correctness, real clinician delivery, emergency dispatch or HIPAA compliance is claimed.
 
-Patient-data update: all 12 fictional snapshots validated against contract 2.0.0. Browser QA verified the specific medicine task, separate completion confirmation, and editable check-in request/proposal. At 390 × 844, the talk control ends above the dock and the page has no horizontal overflow.
+See [check-in integration](docs/VOICE_CHECKIN.md) and [handoff](docs/RANVEER_HANDOFF.md).

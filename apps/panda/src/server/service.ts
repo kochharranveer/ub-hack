@@ -1,4 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
+import { PATIENT_ID } from "../../../../packages/contracts/common";
+import path from "node:path";
 import {
   TurnSchema, ConfirmVoiceSchema, VoiceCommandSchema,
   type VoiceCommand, type VoiceReply, type VoiceContext,
@@ -10,6 +12,7 @@ import { getCare, callPeer, connected } from "../../../../packages/platform/peer
 import { classify, providerStatus } from "./provider";
 import { speechStatus } from "./speech";
 import { SqliteVoiceRepository, voiceDatabaseFile, type VoiceRepository, type Proposal } from "./repository";
+import { PatientMemoryRepository } from "./patient-memory";
 
 export type CareBridge = {
   snapshot: () => Promise<CareSnapshot>;
@@ -17,7 +20,7 @@ export type CareBridge = {
   mode: "connected" | "fixture";
 };
 export type Classifier = (
-  text: string, care: CareSnapshot, signal?: AbortSignal,
+  text: string, care: CareSnapshot, signal?: AbortSignal, patientContext?: string,
 ) => Promise<{ command: VoiceCommand | null; engine: VoiceReply["engine"] }>;
 
 export function voiceService(
@@ -30,10 +33,20 @@ export function voiceService(
   classifier: Classifier = classify,
   repository: VoiceRepository = new SqliteVoiceRepository(file),
   now = Date.now,
+  memory = new PatientMemoryRepository(path.join(path.dirname(file), "patient-memory.sqlite")),
+  identity: () => Promise<string> = async () => PATIENT_ID,
 ) {
+  const repositories=new Map<string,VoiceRepository>([[PATIENT_ID,repository]]);
+  function repositoryFor(patientId:string) {
+    let scoped=repositories.get(patientId);
+    if (!scoped) {scoped=new SqliteVoiceRepository(file+"."+createHash("sha256").update(patientId).digest("hex").slice(0,24)+".sqlite",now);repositories.set(patientId,scoped);}
+    return scoped;
+  }
+  function requirePatient(actual:string,expected:string) {if (actual!==expected) throw new DomainError("FORBIDDEN","Care context does not match the active patient.",403);}
   return {
     async context(): Promise<VoiceContext> {
       const c = await bridge.snapshot();
+      requirePatient(c.patientId,await identity());
       const provider = providerStatus();
       const speech = speechStatus();
       return {
@@ -41,11 +54,22 @@ export function voiceService(
         plan: c.plan, tasks: c.tasks, help: c.help, mode: bridge.mode,
         aiEngine: provider.engine, aiConfigured: provider.configured,
         ttsEngine: speech.engine, ttsConfigured: speech.configured,
+        sttConfigured: Boolean(process.env.PANDA_ELEVENLABS_API_KEY),
       };
     },
-    async turn(raw: unknown, signal?: AbortSignal) {
+    async turn(raw: unknown, signal?: AbortSignal, trustedCommand?: VoiceCommand) {
       const v = TurnSchema.parse(raw);
-      return repository.transaction(async tx => {
+      const patientId=await identity(),repo=repositoryFor(patientId);
+      const cached = await repo.transaction(tx => tx.receipt(v.requestId));
+      if (cached) {
+        if (cached.fingerprint !== JSON.stringify(v)) throw new DomainError("CONFLICT", "Request ID reused with different input");
+        return cached.result;
+      }
+      // Read memory before taking the voice transaction lock. Check-in operations
+      // may create proposals while holding the memory lock; never invert that order.
+      let recalled:Awaited<ReturnType<PatientMemoryRepository["recall"]>>|undefined;
+      if (!trustedCommand) {const current=await bridge.snapshot();requirePatient(current.patientId,patientId);recalled=await memory.recall(patientId);}
+      return repo.transaction(async tx => {
         const fingerprint = JSON.stringify(v);
         const previous = tx.receipt(v.requestId);
         if (previous) {
@@ -55,9 +79,16 @@ export function voiceService(
         }
         signal?.throwIfAborted();
         const care = await bridge.snapshot();
+        requirePatient(care.patientId,patientId);
         if (!care.plan || care.plan.status !== "approved")
           throw new DomainError("CONFLICT", "No approved plan is available");
-        const routed = await classifier(v.text, care, signal);
+        if (recalled && recalled.patientId !== care.patientId)
+          throw new DomainError("CONFLICT", "Patient context changed. Start a fresh request.");
+        const routed = trustedCommand
+          ? { command: trustedCommand, engine: "checkin_workflow" as const }
+          : await classifier(v.text, care, signal, JSON.stringify({ patientId: recalled?.patientId, totalEvents: recalled?.totalEvents,
+              entries: recalled?.events.slice(0,16).map(event => ({ ...event, quote: event.quote.slice(0,500) })),
+              latestByTopic: recalled && Object.fromEntries(Object.entries(recalled.byKind).map(([kind,entries])=>[kind,entries.slice(0,2).map(event=>({quote:event.quote.slice(0,500),at:event.at,source:event.source}))])) }));
         signal?.throwIfAborted();
         const command = routed.command === null ? null : VoiceCommandSchema.parse(routed.command);
         // Preserve the user's quote, never a model paraphrase.
@@ -70,6 +101,18 @@ export function voiceService(
           ...reply, message: care.plan.instructions.map(i => i.text).join("\n"),
           sourceRefs: care.plan.instructions.map(i => i.sourceRef),
         };
+        if (command?.name === "read_patient_context") {
+          const remembered = recalled ?? { events: [] };
+          const topic = command.args.topic;
+          const kinds = topic === "food" ? ["food"] : topic === "medications" ? ["medication_report"] :
+            topic === "exercise" ? ["exercise_readiness", "exercise_report", "exercise_review", "pain_review", "exercise_feedback"] :
+            topic === "checkins" ? ["scheduling_pending"] : null;
+          const entries = (kinds && recalled ? kinds.flatMap(kind=>recalled.byKind[kind as keyof typeof recalled.byKind] ?? []) : remembered.events).sort((a,b)=>b.at.localeCompare(a.at)).slice(0,20);
+          reply = { ...reply, message: entries.length
+            ? entries.map(event => event.at + " · " + event.kind.replaceAll("_", " ") + ": “" + event.quote + "” (" + event.source.replaceAll("_", " ") + ")").join("\n")
+            : "No remembered entries for that topic yet. Start a check-in to add your own reports.",
+            sourceRefs: entries.map(event => "patient-memory:" + event.id) };
+        }
         if (command?.name === "open_exercise") reply = {
           ...reply, message: "Open the exercise app below. Voice stops when you leave Panda.", navigation: "/rehab",
         };
@@ -98,12 +141,14 @@ export function voiceService(
     },
     async confirm(raw: unknown) {
       const v = ConfirmVoiceSchema.parse(raw);
+      const patientId=await identity(),repo=repositoryFor(patientId);
       // Persist the user's confirmation BEFORE crossing the HTTP boundary. A lost
       // response can then be retried after the five-minute proposal window without
       // creating a new action, as long as the same plan is still current.
-      const cached = await repository.transaction(tx => {
+      const cached = await repo.transaction(tx => {
         const p = tx.proposal(v.proposalId);
         if (!p) throw new DomainError("NOT_FOUND", "Proposal not found. Ask Panda again.", 404);
+        requirePatient(p.patientId,patientId);
         if (p.result) return p.result;
         if (p.mode !== bridge.mode)
           throw new DomainError("CONFLICT", "Integration mode changed. Ask Panda for a new proposal.");
@@ -114,10 +159,11 @@ export function voiceService(
         return null;
       });
       if (cached) return cached;
-      return repository.transaction(async tx => {
+      return repo.transaction(async tx => {
         const p = tx.proposal(v.proposalId);
         if (!p) throw new DomainError("NOT_FOUND", "Proposal not found. Ask Panda again.", 404);
         // A completed retry retains its result after plan changes or expiry.
+        requirePatient(p.patientId,patientId);
         if (p.result) return p.result;
         if (p.mode !== bridge.mode)
           throw new DomainError("CONFLICT", "Integration mode changed. Ask Panda for a new proposal.");
@@ -156,9 +202,11 @@ export function voiceService(
     },
     async cancel(raw: unknown) {
       const v = ConfirmVoiceSchema.parse(raw);
-      return repository.transaction(tx => {
+      const patientId=await identity(),repo=repositoryFor(patientId);
+      return repo.transaction(tx => {
         const p = tx.proposal(v.proposalId);
         if (!p) throw new DomainError("NOT_FOUND", "Proposal not found.", 404);
+        requirePatient(p.patientId,patientId);
         if (p.result) return p.result;
         if (p.confirmedAt !== undefined)
           throw new DomainError("CONFIRMATION_PENDING", "Confirmation was already submitted. Retry the same confirmation or check Care for its outcome.", 503);
@@ -167,7 +215,23 @@ export function voiceService(
         return p.result;
       });
     },
-    async history() { return repository.transaction(tx => tx.history()); },
+    async proposalResult(proposalId: string, patientId: string) {
+      if (patientId!==await identity()) return undefined;
+      const repo=repositoryFor(patientId);
+      return repo.transaction(tx => {
+        const proposal = tx.proposal(proposalId);
+        return proposal?.patientId === patientId && proposal.result ? proposal : undefined;
+      });
+    },
+    async proposalStatus(proposalId: string, patientId: string) {
+      if (patientId!==await identity()) return undefined;
+      const repo=repositoryFor(patientId);
+      return repo.transaction(tx => {
+        const proposal=tx.proposal(proposalId);
+        return proposal?.patientId===patientId ? proposal : undefined;
+      });
+    },
+    async history() { const repo=repositoryFor(await identity());return repo.transaction(tx => tx.history()); },
   };
 }
 export const voice = voiceService();
