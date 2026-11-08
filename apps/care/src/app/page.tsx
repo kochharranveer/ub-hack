@@ -1,8 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { CareSnapshot, ExerciseReport } from "@contracts";
-const sample =
-  "FICTIONAL DEMONSTRATION PLAN\nReview your discharge instructions with the demonstration care team.\nTry the demo exercise only to test the software.";
 async function api(path: string, body?: unknown) {
   const res = await fetch("/care/api/" + path, {
     method: body ? "POST" : "GET",
@@ -15,14 +13,30 @@ async function api(path: string, body?: unknown) {
 }
 export default function Care() {
   const [data, setData] = useState<CareSnapshot | null>(null),
+    [draftEdits, setDraftEdits] = useState<Record<string, { text: string; audience: "patient" | "clinician" }>>({}),
+    [fhirPlans, setFhirPlans] = useState<Array<{ id: string; title: string; status: string; preview: string; period: { start?: string; end?: string } | null }>>([]),
+    [selectedFhirPlan, setSelectedFhirPlan] = useState(""),
     [reports, setReports] = useState<ExerciseReport[]>([]),
-    [text, setText] = useState(sample),
+    [fhir, setFhir] = useState<{ connected: boolean; baseUrl: string; fhirVersion: string; supportsCarePlan: boolean; patientConfigured: boolean } | null>(null),
     [status, setStatus] = useState(""),
     [reportError, setReportError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [clinician, setClinician] = useState(true);
+    [busy, setBusy] = useState(false);
+  const clinician = true;
   async function load() {
     setData(await api("state"));
+    try {
+      setFhir(await api("fhir/status"));
+    } catch {
+      setFhir(null);
+    }
+    try {
+      const plans = await api("fhir/plans");
+      setFhirPlans(plans);
+      setSelectedFhirPlan((current) => plans.some((plan: { id: string }) => plan.id === current) ? current : plans[0]?.id || "");
+    } catch {
+      setFhirPlans([]);
+      setSelectedFhirPlan("");
+    }
     try {
       setReports(await api("reports"));
       setReportError("");
@@ -53,12 +67,10 @@ export default function Care() {
         <br />A visible next step.
       </h1>
       <p className="intro">
-        Import instructions, review them, and approve the patient plan. The care
-        team acknowledges requests and saved exercise reports here.
+        Turn patient record facts into a cited draft, review it, and approve only
+        the actions that belong on the patient checklist.
       </p>
-      <button className="secondary" onClick={() => setClinician(!clinician)}>
-        {clinician ? "Show patient plan" : "Show clinician workspace"}
-      </button>
+      <a className="button" href="/care/portal">Open doctor portal</a>
       <button
         className="secondary"
         onClick={() => void load().catch((e) => setStatus(e.message))}
@@ -75,58 +87,97 @@ export default function Care() {
           <section>
             {clinician && (
               <div className="card">
-                <h2>1. Import & review</h2>
+                <h2>1. EHR care plan</h2>
                 <p className="muted">
-                  Text-file import works. PDF/OCR extraction is a planned
-                  extension. Every imported line remains a draft until reviewed.
+                  Sync the configured synthetic patient’s active care plan from FHIR. Each import stays a draft until a clinician reviews and approves it.
                 </p>
-                <label>
-                  Choose a .txt file
-                  <input
-                    type="file"
-                    accept=".txt,text/plain"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        if (file.size > 20000) {
-                          setStatus("Use a text file under 20 KB.");
-                          return;
-                        }
-                        setText(await file.text());
-                      }
-                    }}
-                  />
-                </label>
-                <label>
-                  Source instructions
-                  <textarea
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                  />
-                </label>
+                {fhir ? (
+                  <p className="muted">FHIR {fhir.fhirVersion} · {fhir.baseUrl} · {fhir.patientConfigured ? "Synthetic patient configured" : "Set FHIR_PATIENT_ID to enable sync"}</p>
+                ) : (
+                  <p className="muted">FHIR connection is unavailable. Check the server settings and try again.</p>
+                )}
+                {fhirPlans.length > 0 && (
+                  <label>
+                    Choose an active FHIR plan
+                    <select value={selectedFhirPlan} onChange={(event) => setSelectedFhirPlan(event.target.value)}>
+                      {fhirPlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.title}{plan.period?.end ? ` (ends ${plan.period.end})` : ""}</option>)}
+                    </select>
+                  </label>
+                )}
                 <button
-                  disabled={busy}
-                  onClick={() => act("plans/import", { sourceText: text })}
+                  disabled={busy || !fhir?.patientConfigured || !fhir.supportsCarePlan || !selectedFhirPlan}
+                  onClick={() => act("fhir/sync", { carePlanId: selectedFhirPlan })}
                 >
-                  Create draft
+                  Sync care plan from FHIR
                 </button>
                 {data.drafts.map((d) => (
                   <div className="row" key={d.id}>
-                    <span className="pill">Draft v{d.version}</span>
-                    {d.instructions.map((i) => (
-                      <p key={i.id}>
-                        {i.text}
-                        <br />
-                        <small>{i.sourceRef}</small>
-                      </p>
-                    ))}
+                    <span className="pill">AI-assisted draft v{d.version} · clinician review required</span>
+                    {d.summary && (
+                      <div>
+                        <p><strong>AI record summary:</strong> {d.summary}</p>
+                        {d.summaryEvidence?.map((evidence) => (
+                          <blockquote key={evidence.sourceRef}>
+                            “{evidence.quote}”<br /><small>{evidence.sourceRef}</small>
+                          </blockquote>
+                        ))}
+                      </div>
+                    )}
+                    {d.dataWarnings?.map((warning) => <p className="muted" key={warning}>Data note: {warning}</p>)}
+                    {d.clinicalContext?.length ? (
+                      <details>
+                        <summary>Patient context used ({d.clinicalContext.length} facts)</summary>
+                        {d.clinicalContext.map((fact) => (
+                          <p key={fact.sourceRef}>
+                            <strong>{fact.label}:</strong> {fact.value}{fact.observedAt ? ` · ${fact.observedAt}` : ""}
+                            <br /><small>{fact.sourceRef}</small>
+                          </p>
+                        ))}
+                      </details>
+                    ) : <p className="muted">No additional condition, observation, medication, or goal data was available from this FHIR server.</p>}
+                    <h3>Proposed items</h3>
+                    <p className="muted">These are proposed actions. After approval, patient items become checklist tasks. Medication details are managed separately in the patient record and shown read-only in the patient portal.</p>
+                    {d.instructions.map((i) => {
+                      const edit = draftEdits[i.id] || { text: i.text, audience: i.audience || "patient" };
+                      return (
+                        <div className="row" key={i.id}>
+                          <label>
+                            Proposed action
+                            <textarea
+                              value={edit.text}
+                              onChange={(event) => setDraftEdits((current) => ({ ...current, [i.id]: { ...edit, text: event.target.value } }))}
+                              rows={2}
+                              aria-label="Review and edit proposed plan item"
+                            />
+                          </label>
+                          <label>
+                            After approval, send to
+                            <select
+                              value={edit.audience}
+                              onChange={(event) => setDraftEdits((current) => ({ ...current, [i.id]: { ...edit, audience: event.target.value as "patient" | "clinician" } }))}
+                            >
+                              <option value="patient">Patient checklist</option>
+                              <option value="clinician">Doctor review only</option>
+                            </select>
+                          </label>
+                          {i.rationale && <p><strong>Why AI included this:</strong> {i.rationale}</p>}
+                          {i.evidence?.map((evidence) => (
+                            <blockquote key={evidence.sourceRef}>
+                              “{evidence.quote}”<br /><small>{evidence.sourceRef}</small>
+                            </blockquote>
+                          ))}
+                        </div>
+                      );
+                    })}
                     <button
                       disabled={busy}
-                      onClick={() =>
-                        act("plans/" + d.id + "/approve", {
-                          expectedCurrentVersion: data.plan?.version || 0,
-                        })
-                      }
+                      onClick={() => act("plans/" + d.id + "/approve", {
+                        expectedCurrentVersion: data.plan?.version || 0,
+                        edits: d.instructions.map((item) => ({
+                          id: item.id,
+                          ...(draftEdits[item.id] || { text: item.text, audience: item.audience || "patient" }),
+                        })),
+                      })}
                     >
                       Approve reviewed plan
                     </button>
@@ -139,41 +190,43 @@ export default function Care() {
               <span className="pill">
                 Version {data.plan?.version || "none"}
               </span>
-              {data.plan?.instructions.map((i) => (
+              {clinician && data.plan?.summary && (
+                <div>
+                  <p><strong>Record summary:</strong> {data.plan.summary}</p>
+                  {data.plan.summaryEvidence?.map((evidence) => (
+                    <blockquote key={evidence.sourceRef}>“{evidence.quote}”<br /><small>{evidence.sourceRef}</small></blockquote>
+                  ))}
+                  {data.plan.clinicalContext?.length ? (
+                    <details>
+                      <summary>Clinical context reviewed ({data.plan.clinicalContext.length})</summary>
+                      {data.plan.clinicalContext.map((fact) => <p key={fact.sourceRef}><strong>{fact.label}:</strong> {fact.value}<br /><small>{fact.sourceRef}</small></p>)}
+                    </details>
+                  ) : null}
+                </div>
+              )}
+              {clinician && data.plan?.instructions.filter((item) => item.audience === "clinician").map((item) => (
+                <div className="row" key={item.id}>
+                <span className="pill">Doctor review only</span>
+                  <p>{item.text}</p>
+                  {item.rationale && <p><strong>Why:</strong> {item.rationale}</p>}
+                  {item.evidence?.map((evidence) => <blockquote key={evidence.sourceRef}>“{evidence.quote}”<br /><small>{evidence.sourceRef}</small></blockquote>)}
+                </div>
+              ))}
+              {data.plan?.instructions.filter((i) => (i.audience || "patient") === "patient").map((i) => (
                 <div className="row" key={i.id}>
                   <p>{i.text}</p>
                   <small>Source: {i.sourceRef}</small>
                 </div>
               ))}
-              <h3>Patient-reported checklist</h3>
+              <h3>Patient checklist status</h3>
               {data.tasks.map((t) => (
                 <div key={t.id} className="row">
                   <p>{t.title}</p>
                   <span className="pill">
                     {t.status} · {t.evidence}
                   </span>
-                  {t.status === "pending" && (
-                    <button
-                      disabled={busy}
-                      className="secondary"
-                      onClick={() =>
-                        act("tasks/" + t.id + "/confirm", {
-                          expectedRevision: t.revision,
-                          evidence: "patient_reported",
-                        })
-                      }
-                    >
-                      Confirm I completed this
-                    </button>
-                  )}
                 </div>
               ))}
-              <a className="button" href="/rehab">
-                Open exercise app
-              </a>
-              <a className="button secondary" href="/">
-                Talk to Panda
-              </a>
             </div>
           </section>
           <section>

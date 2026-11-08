@@ -1,7 +1,21 @@
 import { z } from "zod";
 export const InstructionSchema = z
-  .object({ id: z.string(), text: z.string(), sourceRef: z.string() })
+  .object({
+    id: z.string(),
+    text: z.string(),
+    sourceRef: z.string(),
+    audience: z.enum(["patient", "clinician"]).optional(),
+    rationale: z.string().max(2000).optional(),
+    evidence: z.array(z.object({ sourceRef: z.string(), quote: z.string() }).strict()).max(20).optional(),
+  })
   .strict();
+export const ClinicalFactSchema = z.object({
+  resourceType: z.string(),
+  label: z.string(),
+  value: z.string(),
+  sourceRef: z.string(),
+  observedAt: z.string().nullable(),
+}).strict();
 export const PlanSchema = z
   .object({
     id: z.string(),
@@ -9,6 +23,11 @@ export const PlanSchema = z
     version: z.number().int().positive(),
     status: z.enum(["draft", "approved", "superseded"]),
     sourceText: z.string(),
+    sourceRef: z.string().max(500).nullable().optional(),
+    summary: z.string().max(3000).optional(),
+    summaryEvidence: z.array(z.object({ sourceRef: z.string(), quote: z.string() }).strict()).max(20).optional(),
+    clinicalContext: z.array(ClinicalFactSchema).max(100).optional(),
+    dataWarnings: z.array(z.string().max(500)).max(20).optional(),
     instructions: z.array(InstructionSchema),
     approvedBy: z.string().nullable(),
     demoOnly: z.literal(true),
@@ -57,12 +76,30 @@ export const ImportPlanSchema = z
   .object({
     requestId: z.string().min(8),
     sourceText: z.string().trim().min(1).max(20000),
+    sourceRef: z.string().max(500).optional(),
+    sourcePatientId: z.string().min(1).max(200).optional(),
+    summary: z.string().trim().max(3000).optional(),
+    summaryEvidence: z.array(z.object({ sourceRef: z.string(), quote: z.string() }).strict()).max(20).optional(),
+    clinicalContext: z.array(ClinicalFactSchema).max(100).optional(),
+    dataWarnings: z.array(z.string().max(500)).max(20).optional(),
+    instructions: z.array(InstructionSchema).max(100).optional(),
+  })
+  .strict();
+export const FhirSyncSchema = z
+  .object({
+    requestId: z.string().min(8),
+    carePlanId: z.string().min(1).max(200).optional(),
   })
   .strict();
 export const ApprovePlanSchema = z
   .object({
     requestId: z.string().min(8),
     expectedCurrentVersion: z.number().int().nonnegative(),
+    edits: z.array(z.object({
+      id: z.string(),
+      text: z.string().trim().min(1).max(500),
+      audience: z.enum(["patient", "clinician"]),
+    }).strict()).max(100).optional(),
   })
   .strict();
 export const ConfirmTaskSchema = z

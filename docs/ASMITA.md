@@ -1,6 +1,6 @@
 # Asmita — Care hub / complete-function guide, revision 4
 
-Your app is `apps/care`, served at `/care`. You own the complete care-management loop: source document → reviewed draft → approved patient plan → checklist → clinician follow-through. You own its frontend, APIs, domain rules, persistence, validation and tests. **Ranveer now owns all Voice AI. Yuvraj owns all computer vision/exercise reports.**
+Your app is `apps/care`, served at `/care`. You own the doctor-facing care-management loop: FHIR source → reviewed draft → approved patient plan → checklist status → clinician follow-through. This local prototype stores Care data in JSON; a shared database is deferred. **Ranveer owns all Voice AI and the separate patient CareHub. Yuvraj owns all computer vision/exercise reports and the separate patient Exercise app.**
 
 ## 1. Exact responsibilities
 
@@ -10,6 +10,7 @@ Your app is `apps/care`, served at `/care`. You own the complete care-management
 | Daily checklist | Tasks derived from approved plan, patient confirmation, revisions/idempotency, evidence labels |
 | Human handoff | Help request records, clinician patient workspace, acknowledgement, patient-visible status |
 | Report acknowledgement | Fetch Y's saved reports; display estimates/quality and store an acknowledgement referencing session ID |
+| FHIR/EHR integration | Connect to a FHIR server and import sourced CarePlans as drafts; database connection is deferred |
 | Product design | Shared tokens/accessibility/navigation conventions in `packages/ui`; each teammate builds their own screens |
 | Later | Appointments, caregiver access and installable-app experience; PDF/OCR if time after the working text loop |
 
@@ -34,7 +35,7 @@ Read `docs/OWNERSHIP.md`, `SHARED_CONTRACT.md`, `API_STATUS.md`, `BUILD_ORDER.md
 
 ## 3. What the starter already implements
 
-Working text/.txt import, exact source-line display, draft/approval workflow, current plan version, current tasks, patient self-confirmation, help and acknowledgement, report fetch/reference acknowledgement, local persistence and failure messages. Fixed demo clinician/patient identities are not real authentication. PDF/OCR, editable structured extraction, full historical approvals, real appointment booking/caregivers/PWA are not implemented.
+Working FHIR R4 capability check and active CarePlan import to a sourced draft; HAPI `patient-t1` was synced through the service layer. Care currently uses local JSON storage. Fixed demo clinician/patient identities are not real authentication. PDF/OCR, editable structured extraction, full historical approvals, real appointment booking/caregivers/PWA are not implemented.
 
 ### Your exact build order
 

@@ -26,25 +26,50 @@ export function careService(file = dataFile("care")) {
     receipts: {},
   }));
   return {
+    async findPlanBySourceRef(sourceRef: string) {
+      const care = (await db.snapshot()).care;
+      return [care.plan, ...care.drafts].find((plan) =>
+        plan?.sourceRef === sourceRef ||
+        plan?.instructions.some((instruction) => instruction.sourceRef.startsWith(sourceRef + "#")),
+      ) || null;
+    },
     async snapshot() {
       return CareSnapshotSchema.parse((await db.snapshot()).care);
     },
     async importPlan(raw: unknown) {
       const v = ImportPlanSchema.parse(raw);
+      if (v.sourcePatientId && v.sourcePatientId !== process.env.FHIR_PATIENT_ID?.trim()) {
+        throw new DomainError("FHIR_PATIENT_NOT_LINKED", "The FHIR patient does not match the configured Care test patient", 409);
+      }
       return db.update((s) =>
         once(s.receipts, v.requestId, { op: "import", ...v }, () => {
+          if (v.sourceRef) {
+            const existing = [s.care.plan, ...s.care.drafts].find((plan) =>
+              plan?.sourceRef === v.sourceRef ||
+              plan?.instructions.some((instruction) => instruction.sourceRef.startsWith(v.sourceRef + "#")),
+            );
+            if (existing) return existing;
+          }
           const draft = {
             id: randomUUID(),
             patientId: s.care.patientId,
             version: (s.care.plan?.version || 0) + 1,
             status: "draft" as const,
             sourceText: v.sourceText,
-            instructions: v.sourceText
+            sourceRef: v.sourceRef || null,
+            summary: v.summary,
+            summaryEvidence: v.summaryEvidence,
+            clinicalContext: v.clinicalContext,
+            dataWarnings: v.dataWarnings,
+            instructions: v.instructions?.map((instruction) => ({
+              ...instruction,
+              id: randomUUID(),
+            })) ?? v.sourceText
               .split(/\n/)
               .map((t, i) => ({
                 id: "line-" + (i + 1),
                 text: t.trim(),
-                sourceRef: "import.txt:" + (i + 1),
+                sourceRef: (v.sourceRef || "import.txt") + "#line-" + (i + 1),
               }))
               .filter((i) => i.text),
             approvedBy: null,
@@ -70,6 +95,16 @@ export function careService(file = dataFile("care")) {
               "CONFLICT",
               "Plan changed; reload and review a fresh draft",
             );
+          if (v.edits) {
+            const byId = new Map(v.edits.map((edit) => [edit.id, edit]));
+            if (byId.size !== v.edits.length || v.edits.some((edit) => !draft.instructions.some((item) => item.id === edit.id))) {
+              throw new DomainError("VALIDATION_ERROR", "Review edits must refer to unique items in this draft", 400);
+            }
+            draft.instructions = draft.instructions.map((item) => {
+              const edit = byId.get(item.id);
+              return edit ? { ...item, text: edit.text, audience: edit.audience } : item;
+            });
+          }
           if (draft.instructions.length === 0)
             throw new DomainError(
               "VALIDATION_ERROR",
@@ -81,7 +116,7 @@ export function careService(file = dataFile("care")) {
           draft.approvedBy = "demo-clinician";
           s.care.plan = structuredClone(draft);
           s.care.drafts = s.care.drafts.filter((d) => d.id !== id);
-          s.care.tasks = draft.instructions.map((i) => ({
+          s.care.tasks = draft.instructions.filter((i) => (i.audience || "patient") === "patient").map((i) => ({
             id: randomUUID(),
             patientId: s.care.patientId,
             planId: id,
@@ -173,4 +208,5 @@ export function careService(file = dataFile("care")) {
     },
   };
 }
+// The doctor portal uses local JSON storage for this prototype.
 export const care = careService();

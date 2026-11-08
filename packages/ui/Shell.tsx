@@ -10,13 +10,28 @@ export function Shell({
   return (
     <>
       <header>
-        <a className="brand" href="/">
+        <a className="brand" href={app === "care" ? "/care" : "/"}>
           ● panda<span>care</span>
         </a>
         <nav aria-label="Product">
-          <a href="/">Talk to Panda</a>
-          <a href="/care">Care hub</a>
-          <a href="/rehab">Exercise</a>
+          {app === "panda" ? (
+            <>
+              <a href="/">Talk to Panda</a>
+              <a href="/rehab">Exercise</a>
+            </>
+          ) : app === "care" ? (
+            <>
+              <a href="/care">Care plan review</a>
+              <a href="/care/portal">Doctor portal</a>
+            </>
+          ) : (
+            <>
+              <a href="/">Talk to Panda</a>
+              <a href="/care">Care hub</a>
+              <a href="/care/portal">Doctor portal</a>
+              <a href="/rehab">Exercise</a>
+            </>
+          )}
         </nav>
         <small>
           {owner} · {app}

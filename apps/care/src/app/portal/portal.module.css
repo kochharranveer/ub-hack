@@ -1,0 +1,346 @@
+.portal {
+  max-width: 1440px;
+}
+
+.topline,
+.topActions,
+.panelHeading,
+.detailHeading,
+.sectionTitle,
+.footerActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.topline {
+  margin-bottom: 28px;
+  align-items: flex-start;
+}
+
+.topline h1 {
+  margin-bottom: 8px;
+}
+
+.subtitle,
+.panelHeading p,
+.patientMeta,
+.sectionTitle span,
+.recordKicker {
+  color: var(--muted);
+}
+
+.subtitle {
+  max-width: 620px;
+  margin-top: 0;
+}
+
+.topActions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.localBadge,
+.patientMeta,
+.sectionTitle span,
+.recordKicker {
+  font-size: 13px;
+}
+
+.localBadge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: var(--warm);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.78fr) minmax(0, 1.65fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.listPanel,
+.detailPanel {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  min-width: 0;
+}
+
+.listPanel {
+  overflow: hidden;
+}
+
+.panelHeading {
+  padding: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.panelHeading h2,
+.panelHeading p,
+.detailHeading h2,
+.sectionTitle h3 {
+  margin: 0;
+}
+
+.panelHeading p {
+  margin-top: 5px;
+  font-size: 13px;
+}
+
+.panelHeading button {
+  margin: 0;
+  padding: 9px 12px;
+}
+
+.patientList {
+  display: grid;
+}
+
+.patientRow {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 10px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+  padding: 17px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: white;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.patientRow:last-child {
+  border-bottom: 0;
+}
+
+.patientRow:hover,
+.patientRowSelected {
+  background: #f1f5ef;
+}
+
+.patientRowSelected {
+  box-shadow: inset 4px 0 var(--green);
+}
+
+.patientRow:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.patientAvatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--warm);
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.patientRowBody {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.patientName {
+  font-weight: 700;
+}
+
+.patientConcern,
+.patientMeta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.patientConcern {
+  font-size: 13px;
+}
+
+.patientMeta {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.statusDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #4a8b66;
+}
+
+.statusDotDue {
+  background: #d28a2f;
+}
+
+.statusDotAlert {
+  background: #b65348;
+}
+
+.detailPanel {
+  padding: 24px;
+}
+
+.detailHeading {
+  align-items: flex-start;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.detailHeading h2 {
+  font-size: 26px;
+}
+
+.recordKicker {
+  margin: 0 0 7px;
+}
+
+.detailHeading .patientMeta {
+  margin-top: 7px;
+}
+
+.statusField {
+  min-width: 170px;
+  margin: 0;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 18px;
+  margin-top: 14px;
+}
+
+.formGrid label,
+.statusField {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.formGrid small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.formGrid input,
+.formGrid textarea,
+.statusField select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #b6c9bb;
+  border-radius: 8px;
+  padding: 11px 12px;
+  background: #fcfdfb;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+}
+
+.formGrid textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.sectionTitle {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.sectionTitle h3 {
+  font-size: 16px;
+}
+
+.footerActions {
+  margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.footerActions button {
+  margin: 0;
+}
+
+.success {
+  color: var(--green);
+}
+
+.empty {
+  padding: 24px;
+  color: var(--muted);
+}
+
+.patientRow:focus-visible,
+.formGrid input:focus-visible,
+.formGrid textarea:focus-visible,
+.statusField select:focus-visible {
+  outline: 3px solid #bf8a36;
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .workspace {
+    grid-template-columns: minmax(250px, 0.85fr) minmax(0, 1.4fr);
+  }
+
+  .detailPanel {
+    padding: 18px;
+  }
+}
+
+@media (max-width: 720px) {
+  .topline {
+    display: grid;
+  }
+
+  .topActions {
+    justify-content: flex-start;
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .patientList {
+    max-height: 310px;
+    overflow-y: auto;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .wide {
+    grid-column: auto;
+  }
+
+  .detailHeading {
+    display: grid;
+  }
+
+  .footerActions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

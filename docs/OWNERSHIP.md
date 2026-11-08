@@ -8,6 +8,7 @@ MECE applies to the frozen MVP: every function below has exactly one accountable
 | --- | --- | --- | --- |
 | Voice/text assistant, conversation, microphone, speech, prompts, AI routing, action proposals/confirmation | Ranveer | `apps/panda/**`, `packages/contracts/voice.ts`, `tests/voice*`, `tests/providers*` | Patient; links to Care/Rehab |
 | Document import, extraction/review, approval and plan versions | Asmita | `apps/care/**`, `packages/contracts/care.ts`, `tests/care*`; care documents/plans | Voice and Rehab read approved plan |
+| FHIR/EHR connection and CarePlan import | Asmita | Care FHIR adapter and Care APIs | Imported resources become clinician-reviewed Care drafts; shared persistence is deferred |
 | Daily checklist, patient-reported confirmation and revision rules | Asmita | Care task service and plan/checklist screens | Voice invokes the same confirmation API |
 | Help requests, clinician roster/detail, request acknowledgement and report acknowledgement | Asmita | Care help/acknowledgement records and clinician UI | Voice creates help; Care reads Rehab reports |
 | Camera permissions/preview, pose inference, calibration, rep logic and tracking states | Yuvraj | `apps/rehab/**`, `packages/contracts/rehab.ts`, `tests/rehab*`; model/WASM assets | Patient exercise web app |
@@ -38,7 +39,7 @@ A report acknowledgement is not a report edit. Asmita stores `{sessionId, by, at
 | PDF/OCR + assisted extraction | Asmita | Draft/source provenance; approval remains a clinician action |
 | Appointments | Asmita | Request, availability adapter contract, review/confirmed status, patient calendar; never claim a request is booked |
 | Server reminders and consented outbound calls | Ranveer | Preferences/consent for notifications, scheduler/jobs, retries, provider callbacks and delivery status; read care tasks/appointments |
-| CRM/EHR integration | Ranveer | Connection/OAuth, FHIR adapter, mapping, import/export/sync status UI and services; imports enter Asmita's draft-review API |
+| CRM/EHR integration | Asmita | Connection/auth, FHIR adapter, mapping, import/sync status and Care persistence; imported resources enter clinician review |
 | Refill or treatment-change requests | Asmita | Review workflow only; no AI prescribing or automatic medication change |
 | Caregiver invitations and shared status | Asmita | Relationship/access grant, consent and portal; use original domain APIs |
 | Wearable/sensor integration | Yuvraj | Device/provider authorization, normalization, sensor evidence/history; require a separate supported-provider contract |

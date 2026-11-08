@@ -1,6 +1,6 @@
 # Exact build order — three people, functional ownership
 
-Keep one working end-to-end loop. MVP excludes EHR, wearables, booking, background calls and PWA polish until the loop works on a phone and clinician browser.
+Keep one working end-to-end loop. Asmita is implementing a local synthetic FHIR-to-Care draft and clinician review loop; shared database wiring, production EHR authorization, wearables, booking, background calls and PWA polish remain later work.
 
 | Round | Ranveer: Panda | Asmita: Care | Yuvraj: Rehab | Integration gate |
 | --- | --- | --- | --- | --- |
