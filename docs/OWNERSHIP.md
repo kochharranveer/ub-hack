@@ -10,7 +10,7 @@ MECE applies to the frozen MVP: every function below has exactly one accountable
 | Document import, extraction/review, approval and plan versions | Asmita | `apps/care/**`, `packages/contracts/care.ts`, `tests/care*`; care documents/plans | Voice and Rehab read approved plan |
 | Daily checklist, patient-reported confirmation and revision rules | Asmita | Care task service and plan/checklist screens | Voice invokes the same confirmation API |
 | Help requests, clinician roster/detail, request acknowledgement and report acknowledgement | Asmita | Care help/acknowledgement records and clinician UI | Voice creates help; Care reads Rehab reports |
-| Camera permissions/preview, pose inference, calibration, rep logic and tracking states | Yuvraj | `apps/rehab/**`, `packages/contracts/rehab.ts`, `tests/rehab*`; model/WASM assets | Patient exercise web app |
+| Camera permissions/preview, pose inference, calibration, rep logic and tracking states | Yuvraj | `apps/rehab/**`, `packages/rehab-bridge/Workspace.tsx`, `packages/contracts/rehab.ts`, `tests/rehab*`; model/WASM assets | Patient exercise web app |
 | Exercise session lifecycle, measurements, report creation/storage/history | Yuvraj | Rehab sessions/reports API and repositories | Care fetches reports, stores acknowledgement references |
 
 No role is called "all frontend" or "all backend". Asmita does not build Yuvraj's session APIs; Ranveer does not build Asmita's care backend; Yuvraj does not build another voice agent.
@@ -43,7 +43,7 @@ A report acknowledgement is not a report edit. Asmita stores `{sessionId, by, at
 | Caregiver invitations and shared status | Asmita | Relationship/access grant, consent and portal; use original domain APIs |
 | Wearable/sensor integration | Yuvraj | Device/provider authorization, normalization, sensor evidence/history; require a separate supported-provider contract |
 | Installable-app experience | Asmita | Manifest/assets/install/offline states; all three verify their own route behavior |
-| Continuous voice during camera sessions | Ranveer, sole feature owner | Requires a new reviewed bridge with Yuvraj; MVP uses navigation and stops audio on exit |
+| Continuous voice during camera sessions | Ranveer, sole feature owner | Implemented following the expanded request, using bridge1.0.0 and Yuvraj’s shared workspace; teammate review and real-device tests pending |
 
 ## Production migration ownership
 
@@ -55,7 +55,9 @@ For real accounts, Ranveer supplies verified identity/session helpers; every own
 
 - All start from this exact v0.2 repo. Do not mix old v1 guides/components with these apps.
 - One shared Git repository, three app folders and branches. Not three unrelated repos merged on the last night.
-- No app imports another app's UI, service or database. Shared imports are contracts/platform/UI only. Tests may compose services for verification.
+- No app imports another app's UI, service or database. Shared imports are contracts/platform/UI plus the single Rehab workspace and its typed event bridge. Tests may compose services for verification.
 - Keep all app dependencies in the locked workspace; each owner proposes SDK additions, Ranveer merges root/lock changes in sequence.
 - Standalone fixtures are explicit. Connected failures stay failures. No silent fake success.
 - Use small PRs with producer/consumer tests. Broken contracts block merge; unfinished integrations stay visibly pending.
+
+Expanded check-in scope: Ranveer owns `packages/contracts/checkin.ts`, persistent Panda memory and the callback consumer. Yuvraj owns the shared Rehab workspace/producer and canonical sessions/reports. See [VOICE_CHECKIN.md](VOICE_CHECKIN.md). No duplicated pose logic or clinical store was introduced.

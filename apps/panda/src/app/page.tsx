@@ -74,8 +74,7 @@ export default function Panda() {
       {replyText()}{confirmations()}
       <div className={styles.inlineVoiceControls}>
         <button type="button" className="secondary" aria-label="End voice conversation" onClick={()=>{c.stop();setMode("idle");}}>×</button>
-        <button type="button" aria-label={active?"Stop voice activity":"Use microphone"} onClick={()=>active?c.stop():c.listen()}>{active?"■":<MicIcon />}</button>
-        <button type="button" className="secondary" aria-label="Play Panda reply" disabled={c.busy||!c.reply||(c.context?.ttsEngine==="elevenlabs"&&!c.speechConsent)} onClick={()=>void c.speak()}>▷</button>
+        <button type="button" aria-label={active?"Mute conversation":"Resume conversation"} onClick={()=>active?c.stop():c.listen()}>{active?"■":<MicIcon />}</button>
       </div>
       <small className={styles.inlineCaption}>{engine} · {c.context?.ttsEngine==="elevenlabs"?"ElevenLabs":"browser voice"}</small>
     </div>;

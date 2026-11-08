@@ -5,10 +5,10 @@ Branch `ranveer/voice`, based on `ce405fd027e6d8b1d872d00501353c1c21a2a456`. Sha
 ## Implemented
 
 - Compact home actionables: approved medicines, exercise, follow-up pending. Panda in the middle; voice operates inline. Keyboard replaces Panda with a text box and becomes a microphone button.
-- Guided medications → food → scheduling-pending → exercise-readiness → exercise feedback → feelings → pain check. Explicit confirmation gates Care task/help writes.
+- Guided medications → food → scheduling-pending → exercise-readiness → exercise feedback → feelings → pain check. A separate button/spoken confirmation gates Care task/help writes.
 - Patient-scoped persistent SQLite memory, separate from short-lived conversation records. Provider can retrieve remembered quotes with source context.
 - Gemini and optional OpenAI routing with exactly five allowlisted tools: `read_plan`, `read_patient_context`, `confirm_task`, `request_help`, `open_exercise`. Fixed workflow replies are truthfully labelled `checkin_workflow`.
-- Native speech recognition and ElevenLabs recorded-audio fallback; ElevenLabs TTS and browser read-aloud. Hands-free turns resume after speech; Stop/mode switch/page hide/navigation release resources. This is turn-based, not full-duplex.
+- Native speech recognition and ElevenLabs recorded-audio fallback; ElevenLabs TTS and browser read-aloud. Panda speaks automatically, listens again after each reply (including proposals and completed check-ins), and waits through silence. No play/replay button is shown. The initial tap unlocks the audio context; Stop/mode switch/page hide/navigation release resources. This is turn-based, not full-duplex.
 - Durable proposals and explicit confirmations, stable downstream request IDs, stale revision/plan checks, lost-response recovery, cancellation and bounded short-term history.
 - Shared Rehab client component plus typed callbacks, owner-verified sessions/reports and retryable feedback queue. Care and Rehab remain authoritative for their own domain data.
 - Twelve fictional patient snapshots; default Alex is the only active demo identity. No patient switcher pretends to provide authorization.
@@ -41,7 +41,7 @@ The Care help endpoint currently lacks an atomic conditional plan-version argume
 
 ## Live evidence and remaining work
 
-58 automated tests, all three builds,27 connected integration checks and3 standalone checks passed. Gemini routing/memory retrieval and ElevenLabs TTS/STT passed real API checks using synthetic data. Human playback and actual microphone/camera/phone tests are still needed.
+63 automated tests, all three builds,27 connected integration checks and3 standalone checks passed. Gemini routing/memory retrieval and ElevenLabs TTS/STT passed real API checks using synthetic data. Human playback and actual microphone/camera/phone tests are still needed.
 
 Doctor availability and booking remain pending by request. Real pose inference/calibration/rep counting stays with Yuvraj; the existing simulated report is visibly synthetic. Asmita retains clinical plan approval, tasks/help/acknowledgement and future booking ownership. Review the shared Rehab extraction together before merging teammates' camera work.
 

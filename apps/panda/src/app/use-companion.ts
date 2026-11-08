@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { recordedRecognition } from "./recorded-recognition";
+import { spokenConfirmation } from "./voice-confirmation";
+import { ConversationAudio } from "./conversation-audio";
 import type { VoiceContext, VoiceHistoryTurn, VoiceReply } from "@contracts";
 import type { CheckinSession, RehabBridgeEvent } from "../../../../packages/contracts/checkin";
 
@@ -53,8 +55,8 @@ export function useCompanion() {
   const soundGeneration = useRef(0);
   const latestReply = useRef<VoiceReply | null>(null);
   const recognition = useRef<Recognition | null>(null);
-  const audio = useRef<HTMLAudioElement | null>(null);
-  const audioUrl = useRef<string | null>(null);
+  const micRestart = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speaker = useRef(new ConversationAudio());
   const speechAbort = useRef<AbortController | null>(null);
   const requests = useRef(new Set<AbortController>());
   const pending = useRef<{ requestId: string; text: string; route:string; checkinId?:string; expectedStage?:string } | null>(null);
@@ -62,6 +64,8 @@ export function useCompanion() {
   const settledPhase = () => latestReply.current?.proposalId ? "confirmation" as const : "ready" as const;
 
   function stopMic() {
+    if (micRestart.current) clearTimeout(micRestart.current);
+    micRestart.current=null;
     const rec = recognition.current;
     recognition.current = null;
     if (rec) { rec.onresult = null; rec.onerror = null; rec.onend = null; rec.abort(); }
@@ -70,19 +74,14 @@ export function useCompanion() {
     soundGeneration.current++;
     speechAbort.current?.abort();
     speechAbort.current = null;
-    if (audio.current) {
-      audio.current.onended = null; audio.current.onerror = null;
-      audio.current.pause(); audio.current.removeAttribute("src"); audio.current.load();
-    }
-    audio.current = null;
-    if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
-    audioUrl.current = null;
+    speaker.current.stop();
     window.speechSynthesis?.cancel();
   }
   function cleanup() {
     handsfree.current=false;
     generation.current++;
     stopMic(); stopSound();
+    speaker.current.close();
     for (const controller of requests.current) controller.abort();
     requests.current.clear();
     inFlight.current = false;
@@ -242,34 +241,56 @@ export function useCompanion() {
     },()=>{if(live.current)setPhase("thinking");});
     recognition.current = rec;
     rec.lang = "en-US"; rec.continuous = false; rec.interimResults = false;
+    const spokenProposal=latestReply.current?.proposalId;
+    let received=false,failed=false;
     rec.onresult = e => {
       if (recognition.current !== rec || !live.current) return;
+      received=true;
       const transcript=e.results[0][0].transcript;
       setText(transcript);
-      if (handsfree.current) void send(transcript);
+      if (handsfree.current && spokenProposal) {
+        if (spokenProposal!==latestReply.current?.proposalId) return;
+        const choice=spokenConfirmation(transcript);
+        if(choice){setText("");void resolveProposal(choice);}
+        else {
+          stopMic();
+          acceptReply({...latestReply.current!,message:"Please say confirm or cancel for this action.\n"+latestReply.current!.message.replace(/^Please say confirm or cancel for this action\.\n/,"")});
+          void speak();
+        }
+      }
+      else if (handsfree.current) void send(transcript);
       else setNotice("Transcript ready. Review it, then choose Send.");
     };
     rec.onerror = e => {
       if (recognition.current !== rec || !live.current) return;
+      // Silence is normal in a conversation. Keep waiting until the patient ends or mutes it.
+      if(e.error==="no-speech"&&handsfree.current){setPhase("listening");return;}
+      failed=true;handsfree.current=false;
       setError(e.error === "not-allowed" || e.error === "service-not-allowed"
         ? "Microphone permission was denied. Allow it in browser settings, or type below."
         : e.error === "no-speech" ? "No speech was heard. Try again or type below."
         : "Speech recognition is unavailable right now. Type your message below.");
       setPhase(settledPhase());
     };
-    rec.onend = () => { if (recognition.current === rec && live.current) { recognition.current = null; setPhase(settledPhase()); } };
+    rec.onend = () => { if (recognition.current === rec && live.current) {
+      recognition.current = null;
+      if(handsfree.current&&!received&&!failed&&!inFlight.current){
+        setPhase("listening");micRestart.current=setTimeout(()=>{micRestart.current=null;if(live.current&&handsfree.current)mic();},300);
+      }else setPhase(settledPhase());
+    } };
     try { rec.start(); setPhase("listening"); }
     catch { recognition.current = null; setError("Could not start the microphone. Type your message below."); setPhase(settledPhase()); }
   }
   async function speak(browserFallback = false) {
-    const message = latestReply.current?.message;
+    const replyMessage = latestReply.current?.message;
+    const message = replyMessage && (replyMessage+(latestReply.current?.proposalId?"\nSay confirm or cancel.":""));
     if (!message || inFlight.current) return;
     stopMic(); stopSound(); setError(""); setNotice("");
     const token = soundGeneration.current;
     const done = () => {
       if (live.current && token === soundGeneration.current) {
         stopSound(); setPhase(settledPhase());
-        if (handsfree.current && !latestReply.current?.proposalId && checkinRef.current && checkinRef.current.stage!=="complete") mic();
+        if (handsfree.current) mic();
       }
     };
     if (browserFallback || context?.ttsEngine !== "elevenlabs") {
@@ -295,14 +316,9 @@ export function useCompanion() {
         const out = await response.json();
         throw new Error(out.error?.message || "Speech could not load. Choose browser speech or read the text.");
       }
-      const blob = await response.blob();
+      const bytes = await response.arrayBuffer();
       if (controller.signal.aborted || token !== soundGeneration.current || !live.current) return;
-      audioUrl.current = URL.createObjectURL(blob);
-      const player = new Audio(audioUrl.current);
-      audio.current = player;
-      player.onended = done;
-      player.onerror = () => { if (token === soundGeneration.current && live.current) { handsfree.current=false;setError("Audio could not play. Try browser speech."); done(); } };
-      await player.play();
+      await speaker.current.play(bytes,done);
       if (token === soundGeneration.current && live.current) setPhase("speaking");
     } catch (e) {
       if (token === soundGeneration.current && live.current) { handsfree.current=false;setError((e as Error).message); done(); }
@@ -361,6 +377,9 @@ export function useCompanion() {
     let permissionStream:MediaStream|undefined;
     try {
       if (!canMic) throw Error("Speech recognition is unavailable in this browser. Use the keyboard button below.");
+      // Resume from the original tap before awaiting permission/network work.
+      if(context?.ttsEngine==="elevenlabs")await speaker.current.unlock();
+      if (!live.current || token!==generation.current) return;
       if (!micConsentRef.current && navigator.mediaDevices?.getUserMedia) {
         permissionStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
         permissionStream.getTracks().forEach(track=>track.stop());permissionStream=undefined;
@@ -382,7 +401,11 @@ export function useCompanion() {
   }
   function listen() {
     if (!micConsentRef.current || !canMic) {void activateVoice();return;}
-    handsfree.current=true;mic();
+    const token=generation.current;
+    const ready=context?.ttsEngine==="elevenlabs"?speaker.current.unlock():Promise.resolve();
+    void ready.then(()=>{if(live.current&&token===generation.current){handsfree.current=true;mic();}}).catch(()=>{
+      if(live.current&&token===generation.current)setError("Audio is unavailable. Use the keyboard to continue.");
+    });
   }
 
   function changeMicConsent(value: boolean) {
