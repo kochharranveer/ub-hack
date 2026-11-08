@@ -1,6 +1,7 @@
 import { securityHeaders } from "../../packages/platform/production/security-headers";
 import path from "node:path";
 import type { NextConfig } from "next";
+import { PATIENT_ROUTES } from "../../packages/ui/patient-navigation";
 const config: NextConfig = {
   poweredByHeader:false,
   serverExternalPackages:["pg"],
@@ -11,6 +12,10 @@ const config: NextConfig = {
   allowedDevOrigins: process.env.PANDA_DEV_ORIGIN
     ? [process.env.PANDA_DEV_ORIGIN]
     : [],
+  async redirects() {
+    // Match only the retired page. Keep every /rehab/api and model asset intact.
+    return [{ source: "/rehab", destination: PATIENT_ROUTES.exercise, permanent: false }];
+  },
   async rewrites() {
     return [
       {

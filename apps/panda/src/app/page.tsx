@@ -1,6 +1,11 @@
 "use client";
 import { AccountMenu } from "../../../../packages/account-ui/AccountMenu";
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import {
+  PATIENT_ROUTES,
+  exerciseReturnPath,
+} from "../../../../packages/ui/patient-navigation";
 import { useCompanion } from "./use-companion";
 import { approvedMedicationTasks } from "./today-actions";
 import styles from "./panda.module.css";
@@ -132,10 +137,11 @@ type Panel = "medicines" | "memory" | "emergency" | null;
 type Mode = "idle" | "voice" | "text";
 export default function Panda() {
   const c = useCompanion();
+  const exerciseOpen = usePathname() === PATIENT_ROUTES.exercise;
   const [panel, setPanel] = useState<Panel>(null),
     [mode, setMode] = useState<Mode>("idle");
-  const [exerciseOpen, setExerciseOpen] = useState(false),
-    [directDraft, setDirectDraft] = useState(false);
+  const [directDraft, setDirectDraft] = useState(false);
+  const entryRequested = useRef(false);
   const [remembered, setRemembered] = useState<Awaited<
     ReturnType<typeof c.rememberedContext>
   > | null>(null);
@@ -157,21 +163,49 @@ export default function Panda() {
     if (!c.text) setDirectDraft(false);
   }, [c.text]);
   useEffect(() => {
-    if (c.reply?.navigation === "/rehab") setExerciseOpen(true);
+    if (c.reply?.navigation === "/rehab") {
+      // The conversation already entered exercise on the server. Do not enter twice.
+      entryRequested.current = true;
+      showExercise();
+    }
     if (
       c.reply?.checkin &&
       ["exercise_review", "pain_check"].includes(c.reply.checkin.stage)
     )
       setMode((current) => (current === "idle" ? "voice" : current));
   }, [c.reply]);
+  useEffect(() => {
+    if (!exerciseOpen) {
+      if (entryRequested.current) c.stop();
+      entryRequested.current = false;
+      return;
+    }
+    setPanel(null);
+    if (!c.initialized || entryRequested.current) return;
+    entryRequested.current = true;
+    void c.openExercise();
+    // Initial hydration must finish before a direct URL restores the check-in.
+    // The hook owns its request lifecycle; opening happens once per route entry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exerciseOpen, c.initialized]);
+  function showExercise() {
+    if (window.location.pathname !== PATIENT_ROUTES.exercise)
+      window.history.pushState(null, "", PATIENT_ROUTES.exercise);
+  }
   function talk() {
     setMode("voice");
     if (exerciseOpen && c.checkin && c.checkin.stage !== "complete") c.listen();
     else void c.activateVoice();
   }
   function openExercise() {
-    setExerciseOpen(true);
-    void c.openExercise();
+    showExercise();
+  }
+  function closeExercise() {
+    c.stop();
+    setMode("idle");
+    if (exerciseReturnPath(window.location.search) === PATIENT_ROUTES.care)
+      window.location.replace(PATIENT_ROUTES.care);
+    else window.history.replaceState(null, "", PATIENT_ROUTES.today);
   }
   function keyboard() {
     c.stop();
@@ -345,7 +379,7 @@ export default function Panda() {
   }
   return (
     <div className={styles.app}>
-      <div className={styles.surface}>
+      <div className={styles.surface} inert={exerciseOpen}>
         <section className={styles.today} aria-labelledby="today-title">
           <div className={styles.sectionHeading}>
             <h2 id="today-title">Your day, gently.</h2>
@@ -493,20 +527,24 @@ export default function Panda() {
           <AccountMenu onLeave={c.stop} />
         </div>
       </div>
-      <nav className={styles.dock} aria-label="Companion navigation">
+      <nav
+        className={styles.dock}
+        aria-label="Companion navigation"
+        inert={exerciseOpen}
+      >
         <button
           type="button"
           aria-current="page"
           onClick={() => {
             c.stop();
-            setExerciseOpen(false);
+            window.history.replaceState(null, "", PATIENT_ROUTES.today);
             setMode("idle");
           }}
         >
           <WaveIcon />
           <span>Today</span>
         </button>
-        <a href="/care" onClick={c.stop}>
+        <a href={PATIENT_ROUTES.care} onClick={c.stop}>
           <CalendarIcon />
           <span>My plan</span>
         </a>
@@ -526,10 +564,7 @@ export default function Panda() {
             onEvent={c.exerciseFeedback}
             onAskPanda={talk}
             pauseRequested={Boolean(c.reply?.pauseExercise)}
-            onExit={() => {
-              c.stop();
-              setExerciseOpen(false);
-            }}
+            onExit={closeExercise}
             pandaMessage={
               c.checkin?.stage !== "exercise" ||
               ["speaking", "speech_loading"].includes(c.phase)
@@ -608,9 +643,15 @@ export default function Panda() {
                     {c.error}
                     <button
                       type="button"
-                      onClick={() => void c.retryFeedback()}
+                      onClick={() =>
+                        void (async () => {
+                          await c.refresh();
+                          await c.openExercise();
+                          await c.retryFeedback();
+                        })()
+                      }
                     >
-                      Retry sync
+                      Retry connection
                     </button>
                   </p>
                 )}
@@ -755,7 +796,11 @@ export default function Panda() {
                 Medicine details are not available in your approved plan yet.
               </p>
             )}
-            <a className="button secondary" href="/care" onClick={c.stop}>
+            <a
+              className="button secondary"
+              href={PATIENT_ROUTES.care}
+              onClick={c.stop}
+            >
               Open full plan
             </a>
             {c.context?.runtime !== "production" && (

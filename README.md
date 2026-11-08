@@ -12,7 +12,7 @@ One phone/browser product, three independently runnable web apps. Responsibiliti
 | --- | --- | --- | --- |
 | Ranveer | `apps/panda` | Panda voice/text assistant, AI tool routing, audio, confirmation and conversation state | http://localhost:3000 |
 | Asmita | `apps/care` | Document → reviewed/approved plan, checklist rules, clinician requests/acknowledgements | http://localhost:3001/care |
-| Yuvraj | `apps/rehab` | Camera, pose estimation, rep logic, exercise sessions, saved reports/history | http://localhost:3002/rehab |
+| Yuvraj | `apps/rehab` | Camera, pose estimation, rep logic, exercise sessions, saved reports/history | http://localhost:3000/exercise |
 
 Every app includes its own UI, server routes, domain services and persistence. Each consumes the other apps through versioned HTTP contracts. Nobody hands their backend or frontend to another teammate.
 
@@ -26,7 +26,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open **http://localhost:3000**. `/` is Ranveer's app; `/care` and `/rehab` are proxied to the other two Next.js apps, including their assets and API routes. Use ordinary anchor navigation between zones. The guided exercise flow embeds the single shared Rehab workspace to preserve Panda audio; standalone Rehab reuses that same component. Domain APIs/stores remain separate. See [continuous check-in integration](docs/VOICE_CHECKIN.md).
+Open **http://localhost:3000**. The patient pages are `/` (Panda), `/care` (Care Hub), and `/exercise` (camera with Panda). `/rehab` redirects to the same exercise view. Care and Rehab APIs/assets remain proxied to their owning services; there is no second standalone patient exercise screen. Use ordinary anchor navigation between zones. In-page exercise navigation preserves the companion and voice hook. See [navigation verification](docs/PATIENT_NAVIGATION_QA.md) and [continuous check-in integration](docs/VOICE_CHECKIN.md).
 
 A shared [12-patient synthetic dataset](docs/SYNTHETIC_PATIENTS.md) supplies the demo, with Alex active by default. Defaults need no keys. Connected mode uses real local inter-app HTTP, voice-owned SQLite, and Care/Rehab JSON-file persistence; it does not mean connected to a real clinic. Browser microphone support varies; text is always available.
 
@@ -42,7 +42,7 @@ npm run dev:yuvraj
 
 These commands start only that person's app and default to explicit fixture mode. Ranveer gets approved-plan fixtures and dry-run write proposals; Yuvraj gets an approved-plan fixture and his own saved session data; Asmita gets her real local care workflow and an empty fixture report list. The other apps do not have to run. A fixture write is labelled simulated and never claims to update a colleague's app.
 
-For cross-app navigation and integration, use `npm run dev` and port 3000. Standalone Care/Rehab run at their base paths; links to other apps are intended for the shared gateway. Remove a `PANDA_INTEGRATION=connected` override from `.env.local` if you want standalone fixtures.
+For cross-app navigation and integration, use `npm run dev` and port 3000. Standalone Care runs at `/care`; standalone Rehab serves its APIs/assets, while its page redirects to Panda. The patient exercise UI requires the shared gateway. Remove a `PANDA_INTEGRATION=connected` override from `.env.local` if you want standalone fixtures.
 
 ## What works in this starter
 

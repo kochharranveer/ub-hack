@@ -85,9 +85,11 @@ export function useCompanion() {
   const [canMic, setCanMic] = useState(false);
   const [canSpeak, setCanSpeak] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const [checkin, setCheckin] = useState<VoiceReply["checkin"]>();
   const checkinRef = useRef<VoiceReply["checkin"]>(undefined);
   const startAttempt = useRef<{ requestId: string } | null>(null);
+  const exerciseAttempt = useRef<{ requestId: string } | null>(null);
   const continueAttempt = useRef<{
     requestId: string;
     checkinId: string;
@@ -229,6 +231,7 @@ export function useCompanion() {
     );
   }, [context?.sttConfigured]);
   useEffect(() => {
+    let mounted = true;
     live.current = true;
     const initGeneration = generation.current;
     setCanMic(
@@ -253,7 +256,8 @@ export function useCompanion() {
       if (past.status === "fulfilled") {
         setHistory(past.value);
         const last = past.value.at(-1)?.reply;
-        if (last) acceptReply(last);
+        // Restoring a transcript must not replay a past navigation command.
+        if (last) acceptReply({ ...last, navigation: undefined });
       }
       const remembered = results[2];
       if (remembered.status === "fulfilled" && remembered.value.checkin) {
@@ -280,7 +284,9 @@ export function useCompanion() {
       );
       if (failed?.status === "rejected") setError(failed.reason.message);
     };
-    void init();
+    void init().finally(() => {
+      if (mounted) setInitialized(true);
+    });
     const leave = () => cleanup();
     const hide = () => {
       if (document.visibilityState === "hidden") {
@@ -294,6 +300,7 @@ export function useCompanion() {
     window.addEventListener("pagehide", leave);
     document.addEventListener("visibilitychange", hide);
     return () => {
+      mounted = false;
       live.current = false;
       cleanup();
       window.removeEventListener("pagehide", leave);
@@ -736,11 +743,14 @@ export function useCompanion() {
     setError("");
     setNotice("");
     setPhase("thinking");
+    exerciseAttempt.current ??= { requestId: crypto.randomUUID() };
     try {
-      const result = await request<VoiceReply>("voice/checkin/open-exercise", {
-        requestId: crypto.randomUUID(),
-      });
+      const result = await request<VoiceReply>(
+        "voice/checkin/open-exercise",
+        exerciseAttempt.current,
+      );
       if (!live.current || run !== generation.current) return;
+      exerciseAttempt.current = null;
       inFlight.current = false;
       acceptReply(result);
       if (handsfree.current) void speak();
@@ -1056,6 +1066,7 @@ export function useCompanion() {
     canMic,
     canSpeak,
     refreshing,
+    initialized,
     busy: phase === "thinking" || phase === "saving",
     refresh,
     send,

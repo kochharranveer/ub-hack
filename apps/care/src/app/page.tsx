@@ -6,6 +6,7 @@ import type { CvReport } from "../../../../packages/contracts/rehab-cv";
 import type { CareSnapshot, ExerciseReport } from "@contracts";
 import { patientPlan, type PatientPlanItem } from "./patient-plan";
 import styles from "./care.module.css";
+import { PATIENT_ROUTES } from "../../../../packages/ui/patient-navigation";
 
 type IconName =
   | "pill"
@@ -296,7 +297,7 @@ export default function Care() {
     <div className={styles.app}>
       <main className={styles.surface}>
         <header className={styles.topbar}>
-          <a href="/" className={styles.backLink}>
+          <a href={PATIENT_ROUTES.today} className={styles.backLink}>
             <span aria-hidden="true">←</span> Today
           </a>
           <span className={styles.pageLabel}>Care hub</span>
@@ -435,7 +436,10 @@ export default function Care() {
                   </p>
                 )}
                 {groups.exercise.length > 0 && (
-                  <a href="/rehab" className={styles.cardLink}>
+                  <a
+                    href={PATIENT_ROUTES.exerciseFromCare}
+                    className={styles.cardLink}
+                  >
                     Open guided exercise <Icon name="arrow" />
                   </a>
                 )}
@@ -633,7 +637,10 @@ export default function Care() {
                       report here.
                     </p>
                     {groups.exercise.length > 0 && (
-                      <a href="/rehab" className={styles.cardLink}>
+                      <a
+                        href={PATIENT_ROUTES.exerciseFromCare}
+                        className={styles.cardLink}
+                      >
                         Start an exercise <Icon name="arrow" />
                       </a>
                     )}
@@ -717,15 +724,15 @@ export default function Care() {
         </p>
       </main>
       <nav className={styles.dock} aria-label="Companion navigation">
-        <a href="/">
+        <a href={PATIENT_ROUTES.today}>
           <Icon name="wave" />
           <span>Today</span>
         </a>
-        <a href="/care" aria-current="page">
+        <a href={PATIENT_ROUTES.care} aria-current="page">
           <Icon name="calendar" />
           <span>My plan</span>
         </a>
-        <a href="/rehab">
+        <a href={PATIENT_ROUTES.exerciseFromCare}>
           <Icon name="exercise" />
           <span>Exercise</span>
         </a>

@@ -187,7 +187,7 @@ try {
     exact: true,
   });
   await workspace.waitFor();
-  assert.equal(new URL(page.url()).pathname, "/");
+  assert.equal(new URL(page.url()).pathname, "/exercise");
   const corner = page.getByRole("complementary", {
     name: "Panda exercise companion",
   });

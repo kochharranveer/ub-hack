@@ -73,7 +73,7 @@ try {
   for (const [route, label] of [
     ["/", "Talk to Panda"],
     ["/care", "Your care,"],
-    ["/rehab", "Every movement."],
+    ["/exercise", "Guided exercise camera"],
   ]) {
     const r = await fetch(origin + route);
     assert.equal(r.status, 200);
@@ -89,6 +89,19 @@ try {
     }
     checks++;
   }
+  for (const legacy of ["/rehab", "/rehab/"]) {
+    const result = await fetch(origin + legacy);
+    assert.equal(result.status, 200);
+    assert.equal(new URL(result.url).pathname, "/exercise");
+    assert.ok((await result.text()).includes("Panda exercise companion"));
+    checks++;
+  }
+  const directExercise = await fetch(origin + "/exercise?from=care");
+  assert.equal(directExercise.status, 200);
+  assert.ok((await directExercise.text()).includes("Exit exercise"));
+  checks++;
+  assert.equal((await fetch(origin + "/missing-patient-page")).status, 404);
+  checks++;
   const initial = await api("/care/api/state");
   assert.equal(initial.plan.version, 1);
   checks++;

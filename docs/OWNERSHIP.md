@@ -10,7 +10,7 @@ MECE applies to the frozen MVP: every function below has exactly one accountable
 | Document import, extraction/review, approval and plan versions | Asmita | `apps/care/**`, `packages/contracts/care.ts`, `tests/care*`; care documents/plans | Voice and Rehab read approved plan |
 | Daily checklist, patient-reported confirmation and revision rules | Asmita | Care task service and plan/checklist screens | Voice invokes the same confirmation API |
 | Help requests, clinician roster/detail, request acknowledgement and report acknowledgement | Asmita | Care help/acknowledgement records and clinician UI | Voice creates help; Care reads Rehab reports |
-| Camera permissions/preview, pose inference, calibration, rep logic and tracking states | Yuvraj | `apps/rehab/**`, `packages/rehab-bridge/Workspace.tsx`, `packages/contracts/rehab.ts`, `tests/rehab*`; model/WASM assets | Patient exercise web app |
+| Camera permissions/preview, pose inference, calibration, rep logic and tracking states | Yuvraj | `apps/rehab/**`, `packages/rehab-bridge/GuidedWorkspace.tsx`, `packages/contracts/rehab.ts`, `tests/rehab*`; model/WASM assets | Patient exercise web app |
 | Exercise session lifecycle, measurements, report creation/storage/history | Yuvraj | Rehab sessions/reports API and repositories | Care fetches reports, stores acknowledgement references |
 
 No role is called "all frontend" or "all backend". Asmita does not build Yuvraj's session APIs; Ranveer does not build Asmita's care backend; Yuvraj does not build another voice agent.

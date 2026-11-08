@@ -363,10 +363,9 @@ test("direct exercise opening and spoken navigation do not depend on model gener
     text: "Open the rehab section",
   });
   assert.equal(spoken.navigation, "/rehab");
-  assert.equal(
-    (await chat.start({ requestId: randomUUID() })).checkin?.stage,
-    "exercise",
-  );
+  const resumed = await chat.start({ requestId: randomUUID() });
+  assert.equal(resumed.checkin?.stage, "exercise");
+  assert.equal(resumed.navigation, undefined, "Starting a general conversation must not force exercise to reopen");
   assert.equal(modelCalls, 0);
   const remembered = await chat.memory();
   assert.equal(remembered.checkin?.medicationIndex, 0);

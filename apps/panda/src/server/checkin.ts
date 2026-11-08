@@ -197,7 +197,7 @@ export function checkinService(
           if(pending?.command.name==="confirm_task"){const taskId=pending.command.args.taskId;base={...base,message:"Record your completion of “"+care.tasks.find(t=>t.id===taskId)?.title+"”? This is patient-reported."};}
           else if(pending?.command.name==="request_help")base={...base,message:"Record this for care-team review? “"+pending.command.args.quote+"”"};
         }
-        if(s.stage==="exercise")return base;
+        if(s.stage==="exercise")return reply(s,"I'm here. Would you like to continue your exercise, or talk about something else?");
         return say(tx,s,care,v.requestId,base,s.stage==="greeting"?"Greet warmly as Panda, ask how the documented elbow/body part feels. If a prior concern is pending acknowledge it gently. No checklist, medicines, meals or booking at hello.":"Resume the actual unfinished topic naturally. Do not restart completed items or recite the plan. Pending action details remain in the visible proposal.",undefined,signal);
       });
     },

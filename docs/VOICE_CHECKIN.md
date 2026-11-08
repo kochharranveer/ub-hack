@@ -38,7 +38,7 @@ Workflow replies include `checkin:{id,stage}`, `engine:'checkin_workflow'`, and 
 
 ## Exercise ownership and integration
 
-`packages/rehab-bridge/Workspace.tsx` is the single shared Rehab client workspace, re-exported by the standalone Rehab page and embedded by Panda. It continues calling Rehab's own session/report APIs through the gateway. Panda owns neither exercise measurements nor authoritative report storage. This extraction avoids divergent copies of the camera UI.
+`packages/rehab-bridge/GuidedWorkspace.tsx` is the camera adapter embedded by Panda at `/exercise`. The old `/rehab` patient page redirects there; Rehab APIs keep their original paths. It continues calling Rehab's own session/report APIs through the gateway. Panda owns neither exercise measurements nor authoritative report storage. This extraction avoids divergent copies of the camera UI.
 
 The optional callback receives schema-validated v1.0.0 events: `session_started`, `camera_status`, `tracking_status`, `report_saved`. `resumeSessionId` restores an owner session; `onAskPanda` preserves the mounted voice hook. Panda verifies sessions/reports by HTTP before storing references, rejects foreign patients and mismatched plans, and queues feedback with retry IDs. Repeated saved-report events do not rewind a completed review.
 

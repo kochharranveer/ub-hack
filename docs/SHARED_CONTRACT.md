@@ -6,11 +6,11 @@ Authoritative executable types: `packages/contracts/*.ts` (Zod validation). This
 
 | Public product path | App / owner | Local service |
 | --- | --- | --- |
-| `/` and `/api/voice/*`, `/api/context` | Panda / Ranveer | port 3000 |
+| `/`, `/exercise` and `/api/voice/*`, `/api/context` | Panda / Ranveer | port 3000 |
 | `/care/*` including `/care/api/*` | Care / Asmita | port 3001, Next basePath `/care` |
-| `/rehab/*` including `/rehab/api/*` | Rehab / Yuvraj | port 3002, Next basePath `/rehab` |
+| `/rehab/api/*` and model assets; `/rehab` redirects to `/exercise` | Rehab / Yuvraj | port 3002, Next basePath `/rehab` |
 
-Panda proxies Care/Rehab paths, including `_next` assets. The browser sees one origin. Server-to-server calls use private origins, bounded timeouts and `cache:no-store`. Never send server secrets in query strings or browser bundles. Use `<a>` for cross-zone navigation; a hard navigation intentionally unloads voice/camera resources. The guided check-in instead mounts the single shared Rehab workspace within Panda, preserving its voice hook through bridge1.0.0; standalone hard navigation still stops resources. See [VOICE_CHECKIN.md](VOICE_CHECKIN.md) for the additive routes and bridge.
+Panda proxies Care/Rehab paths, including `_next` assets. The browser sees one origin. Server-to-server calls use private origins, bounded timeouts and `cache:no-store`. Never send server secrets in query strings or browser bundles. Use `<a>` for cross-zone navigation; a hard navigation intentionally unloads voice/camera resources. The single exercise patient view at `/exercise` mounts the camera adapter within Panda, preserving its voice hook through bridge1.0.0. Care links include `?from=care` so Exit returns to Care Hub. See [PATIENT_NAVIGATION_QA.md](PATIENT_NAVIGATION_QA.md) for the route cleanup and [VOICE_CHECKIN.md](VOICE_CHECKIN.md) for the additive APIs and bridge.
 
 ## API catalog
 

@@ -26,7 +26,7 @@ git switch -c yuvraj/vision
 npm run dev:yuvraj
 ```
 
-Open http://localhost:3002/rehab. Only your app runs. It uses an explicit approved-plan fixture and saves its own local sessions/reports; no teammate is needed. For connected tests, stop it and run `npm run dev`; enter http://localhost:3000/rehab. Cross-app links are designed for this single shared gateway.
+For API-only development, open http://localhost:3002/rehab/api/context. Only your service runs, with an explicit approved-plan fixture and local session/report storage. For the patient camera UI, run `npm run dev` and enter http://localhost:3000/exercise. `/rehab` now redirects to that one Panda-integrated experience.
 
 Read `docs/OWNERSHIP.md`, `SHARED_CONTRACT.md`, `API_STATUS.md`, `BUILD_ORDER.md`. Use contract v2.0.0, not previous single-app props/widget contracts. No cross-app React imports: integrate with routes and HTTP.
 
@@ -87,7 +87,7 @@ For discomfort, stop/pause locally first, then create one help request through A
 - No-camera/model-failure state remains usable; unavailable tracking has zero/null measurements.
 - Asmita sees your real saved report and acknowledges that session ID.
 
-Give Asmita an actual report payload/session ID and a clear quality/evidence explanation. Give Ranveer the `/rehab` launch path and any future control proposal; don't ask him to write your API. All consumers use the v2 schema, not a custom incompatible copy.
+Give Asmita an actual report payload/session ID and a clear quality/evidence explanation. Give Ranveer the `/exercise` patient launch path and any future control proposal; don't ask him to write your API. All consumers use the v2 schema, not a custom incompatible copy.
 
 Branch `yuvraj/vision`. Merge camera/model early, then counter and real measured save. Run root check/build/integration before merges. Actual live-camera evidence is separate from synthetic unit tests. Root SDK additions are coordinated to avoid lockfile conflicts.
 
