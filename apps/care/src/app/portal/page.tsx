@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { CareSnapshot } from "@contracts";
 import type { PatientRecord, PatientRecordUpdate, PatientRow } from "@/server/patient-portal";
 import styles from "./portal.module.css";
+
+type Appointment = PatientRecord["appointments"][number];
 
 async function api<T>(path: string, method = "GET", body?: unknown): Promise<T> {
   const response = await fetch("/care/api/" + path, {
@@ -18,66 +21,77 @@ async function api<T>(path: string, method = "GET", body?: unknown): Promise<T> 
 
 function updateFrom(record: PatientRecord): PatientRecordUpdate {
   const { id: _id, lastVisit: _lastVisit, updatedAt: _updatedAt, ...update } = record;
-  return update;
+  return { ...update, medications: update.medications.map((medication) => medication.trim()).filter(Boolean) };
 }
 
-function lines(value: string[]) {
-  return value.join("\n");
+function dateKey(date: Date) {
+  return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
 }
 
-function fromLines(value: string) {
-  return value.split("\n").map((line) => line.trim()).filter(Boolean);
+function displayDate(value: string, options: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" }) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, options);
 }
 
-function appointmentLabel(appointment: PatientRow["nextAppointment"]) {
-  if (!appointment) return "Not scheduled";
-  const date = new Date(`${appointment.date}T12:00:00`);
-  const label = Number.isNaN(date.getTime()) ? appointment.date : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  return `${label}${appointment.time ? ` · ${appointment.time}` : ""}`;
+function statusLabel(status: PatientRow["status"]) {
+  return status === "Needs review" ? "Needs action" : status;
 }
 
 export default function ClinicianPortal() {
   const [patients, setPatients] = useState<PatientRow[]>([]);
-  const [selectedId, setSelectedId] = useState("");
   const [record, setRecord] = useState<PatientRecord | null>(null);
+  const [snapshot, setSnapshot] = useState<CareSnapshot | null>(null);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [selectedDate, setSelectedDate] = useState(dateKey(new Date()));
+  const [shownMonth, setShownMonth] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
+  const [addingAppointment, setAddingAppointment] = useState(false);
+  const [appointmentDraft, setAppointmentDraft] = useState({ date: dateKey(new Date()), time: "", clinician: "", purpose: "" });
 
-  async function load() {
+  async function loadPatients() {
     setError("");
-    const index = await api<{ patients: PatientRow[]; selectedPatientId: string }>("patients");
+    const index = await api<{ patients: PatientRow[] }>("patients");
     setPatients(index.patients);
-    const nextId = index.patients.some((patient) => patient.id === index.selectedPatientId)
-      ? index.selectedPatientId
-      : index.patients[0]?.id;
-    if (!nextId) {
-      setRecord(null);
-      setSelectedId("");
-      return;
-    }
-    setSelectedId(nextId);
-    setRecord(await api<PatientRecord>(`patients/${encodeURIComponent(nextId)}`));
-    setDirty(false);
   }
 
   useEffect(() => {
-    void load().catch((cause) => setError((cause as Error).message));
+    void loadPatients().catch((cause) => setError((cause as Error).message));
   }, []);
 
-  async function choosePatient(id: string) {
-    if (id === selectedId) return;
-    if (dirty && !window.confirm("Discard your unsaved changes and switch patients?")) return;
+  useEffect(() => {
+    if (!record) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !dirty) setRecord(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [record, dirty]);
+
+  async function openPatient(id: string) {
+    if (dirty && !window.confirm("Discard unsaved changes and open another patient?")) return;
     setBusy(true);
     setError("");
     setStatus("");
     try {
-      await api(`patients/${encodeURIComponent(id)}/select`, "POST");
-      const selected = await api<PatientRecord>(`patients/${encodeURIComponent(id)}`);
-      setSelectedId(id);
-      setRecord(selected);
+      await api("patients/" + encodeURIComponent(id) + "/select", "POST", {});
+      const [patient, care] = await Promise.all([
+        api<PatientRecord>("patients/" + encodeURIComponent(id)),
+        api<CareSnapshot>("state"),
+      ]);
+      setRecord(patient);
+      setSnapshot(care);
+      const firstDate = patient.appointments[0]?.date || dateKey(new Date());
+      setSelectedDate(firstDate);
+      const [year, month] = firstDate.split("-").map(Number);
+      setShownMonth(new Date(year, month - 1, 1));
       setDirty(false);
+      setAddingAppointment(false);
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -97,18 +111,18 @@ export default function ClinicianPortal() {
     setError("");
     setStatus("");
     try {
-      const saved = await api<PatientRecord>(`patients/${encodeURIComponent(record.id)}`, "PATCH", updateFrom(record));
+      const saved = await api<PatientRecord>("patients/" + encodeURIComponent(record.id), "PATCH", updateFrom(record));
       setRecord(saved);
-      setDirty(false);
       setPatients((current) => current.map((row) => row.id === saved.id ? {
-        id: saved.id,
+        ...row,
         name: saved.name,
         dateOfBirth: saved.dateOfBirth,
         primaryConcern: saved.primaryConcern,
         status: saved.status,
         nextAppointment: saved.nextAppointment,
       } : row));
-      setStatus("Patient record saved locally.");
+      setDirty(false);
+      setStatus("Saved to local demo data.");
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -116,118 +130,189 @@ export default function ClinicianPortal() {
     }
   }
 
-  const updateAppointment = (patch: Partial<NonNullable<PatientRecord["nextAppointment"]>>) => {
+  const appointments = record?.appointments || [];
+  const calendarCells = useMemo(() => {
+    const firstWeekday = new Date(shownMonth.getFullYear(), shownMonth.getMonth(), 1).getDay();
+    const dayCount = new Date(shownMonth.getFullYear(), shownMonth.getMonth() + 1, 0).getDate();
+    return [...Array(firstWeekday).fill(null), ...Array.from({ length: dayCount }, (_, index) => index + 1)];
+  }, [shownMonth]);
+  const selectedAppointments = appointments.filter((appointment) => appointment.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time));
+  const patientProgress = record && snapshot?.patientId === record.id ? snapshot : null;
+  const completedTasks = patientProgress?.tasks.filter((task) => task.status === "completed").length || 0;
+  const totalTasks = patientProgress?.tasks.length || 0;
+  const actionCount = patients.filter((patient) => patient.status !== "Active").length;
+
+  function addAppointment() {
+    if (!record || !appointmentDraft.date || !appointmentDraft.time || !appointmentDraft.purpose.trim()) return;
+    const next: Appointment = { id: crypto.randomUUID(), ...appointmentDraft, purpose: appointmentDraft.purpose.trim() };
+    edit({ appointments: [...record.appointments, next] });
+    setSelectedDate(next.date);
+    const [year, month] = next.date.split("-").map(Number);
+    setShownMonth(new Date(year, month - 1, 1));
+    setAppointmentDraft({ date: next.date, time: "", clinician: "", purpose: "" });
+    setAddingAppointment(false);
+  }
+
+  function removeAppointment(id: string) {
     if (!record) return;
-    edit({ nextAppointment: { date: "", time: "", clinician: "", purpose: "", ...record.nextAppointment, ...patch } });
-  };
+    edit({ appointments: record.appointments.filter((appointment) => appointment.id !== id) });
+  }
+
+  function closeDrawer() {
+    if (dirty && !window.confirm("Discard unsaved changes?")) return;
+    setRecord(null);
+  }
 
   return (
     <div className={styles.portal}>
-      <div className={styles.topline}>
+      <div className={styles.pageIntro}>
         <div>
-          <div className="eyebrow">Care · Clinician portal</div>
-          <h1>Patient records</h1>
-          <p className={styles.subtitle}>Select a patient to review and update the context used for their care experience.</p>
+          <div className="eyebrow">Care · Doctor workspace</div>
+          <h1>Patient overview</h1>
+          <p className={styles.subtitle}>Review progress and manage follow-up for your patients.</p>
         </div>
-        <div className={styles.topActions}>
-          <span className={styles.localBadge}>Local demo data</span>
-          <a className="button secondary" href="/care">Care plan review</a>
+        <div className={styles.summaryCard}>
+          <span className={styles.summaryNumber}>{actionCount}</span>
+          <span>patients need attention</span>
         </div>
       </div>
 
       {status && <p className={styles.success} role="status">{status}</p>}
       {error && <p className="error" role="alert">{error}</p>}
 
-      <div className={styles.workspace}>
-        <section className={styles.listPanel} aria-labelledby="patient-list-heading">
-          <div className={styles.panelHeading}>
-            <div>
-              <h2 id="patient-list-heading">Patients</h2>
-              <p>{patients.length} local records</p>
+      <section className={styles.listPanel} aria-labelledby="patients-heading">
+        <div className={styles.panelHeading}>
+          <div>
+            <h2 id="patients-heading">Patients</h2>
+            <p>{patients.length} local records · patients needing action are shown first</p>
+          </div>
+          <button className="secondary" onClick={() => void loadPatients().catch((cause) => setError((cause as Error).message))} disabled={busy}>Refresh</button>
+        </div>
+        <div className={styles.patientList}>
+          {patients.map((patient) => (
+            <button key={patient.id} type="button" className={styles.patientRow} onClick={() => void openPatient(patient.id)} disabled={busy}>
+              <span className={styles.patientAvatar} aria-hidden="true">{patient.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("")}</span>
+              <span className={styles.patientRowBody}>
+                <span className={styles.patientName}>{patient.name}</span>
+                <span className={styles.patientConcern}>{patient.primaryConcern || "No primary concern entered"}</span>
+                <span className={styles.patientMeta}>Next appointment: {patient.nextAppointment ? displayDate(patient.nextAppointment.date) + " · " + patient.nextAppointment.time : "Not scheduled"}</span>
+              </span>
+              <span className={styles.statusBadge + " " + (patient.status === "Needs review" ? styles.statusAlert : patient.status === "Follow-up due" ? styles.statusDue : styles.statusActive)}>
+                {patient.status !== "Active" && <span className={styles.statusDot} aria-hidden="true" />}{statusLabel(patient.status)}
+              </span>
+              <span className={styles.rowArrow} aria-hidden="true">›</span>
+            </button>
+          ))}
+          {!patients.length && !error && <p className={styles.empty}>No local patient records yet.</p>}
+        </div>
+      </section>
+
+      {record && (
+        <>
+          <button className={styles.backdrop} aria-label="Close patient details" onClick={closeDrawer} />
+          <aside className={styles.drawer} role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+            <div className={styles.drawerHeader}>
+              <div>
+                <div className="eyebrow">Patient details · synthetic record</div>
+                <h2 id="drawer-title">{record.name}</h2>
+                <p>{record.primaryConcern || "No primary concern entered"} · DOB {displayDate(record.dateOfBirth)}</p>
+              </div>
+              <button type="button" className={styles.closeButton} onClick={closeDrawer} aria-label="Close patient details">×</button>
             </div>
-            <button className="secondary" onClick={() => void load().catch((cause) => setError((cause as Error).message))} disabled={busy}>Refresh</button>
-          </div>
-          <div className={styles.patientList}>
-            {patients.map((patient) => (
-              <button
-                key={patient.id}
-                type="button"
-                className={`${styles.patientRow} ${patient.id === selectedId ? styles.patientRowSelected : ""}`}
-                onClick={() => void choosePatient(patient.id)}
-                disabled={busy}
-                aria-current={patient.id === selectedId ? "true" : undefined}
-              >
-                <span className={styles.patientAvatar} aria-hidden="true">{patient.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("")}</span>
-                <span className={styles.patientRowBody}>
-                  <span className={styles.patientName}>{patient.name}</span>
-                  <span className={styles.patientConcern}>{patient.primaryConcern || "No primary concern entered"}</span>
-                  <span className={styles.patientMeta}>{patient.status} · Next: {appointmentLabel(patient.nextAppointment)}</span>
-                </span>
-                <span className={`${styles.statusDot} ${patient.status === "Needs review" ? styles.statusDotAlert : patient.status === "Follow-up due" ? styles.statusDotDue : ""}`} aria-hidden="true" />
-              </button>
-            ))}
-            {!patients.length && !error && <p className={styles.empty}>No local patient records yet.</p>}
-          </div>
-        </section>
 
-        <section className={styles.detailPanel} aria-labelledby="patient-details-heading">
-          {!record ? (
-            <div className={styles.empty}>Choose a patient record to see details.</div>
-          ) : (
-            <>
-              <div className={styles.detailHeading}>
-                <div>
-                  <p className={styles.recordKicker}>Patient details · synthetic record</p>
-                  <h2 id="patient-details-heading">{record.name}</h2>
-                  <p className={styles.patientMeta}>Last visit: {record.lastVisit || "Not recorded"} · Updated: {new Date(record.updatedAt).toLocaleString()}</p>
+            <div className={styles.drawerBody}>
+              <section className={styles.drawerSection} aria-labelledby="progress-heading">
+                <div className={styles.sectionHeading}>
+                  <div><span className={styles.sectionNumber}>01</span><h3 id="progress-heading">Current progress</h3></div>
+                  {patientProgress && <span className={styles.progressCount}>{completedTasks}/{totalTasks} complete</span>}
                 </div>
-                <label className={styles.statusField}>
-                  Record status
-                  <select value={record.status} onChange={(event) => edit({ status: event.target.value as PatientRecord["status"] })}>
-                    <option>Active</option>
-                    <option>Follow-up due</option>
-                    <option>Needs review</option>
-                  </select>
-                </label>
-              </div>
+                {patientProgress?.plan ? (
+                  <>
+                    <div className={styles.planSummary}><span className={styles.planDot} />Approved plan · v{patientProgress.plan.version}</div>
+                    {patientProgress.tasks.map((task) => (
+                      <div className={styles.progressRow} key={task.id}>
+                        <span className={styles.taskMark + " " + (task.status === "completed" ? styles.taskComplete : "")}>{task.status === "completed" ? "✓" : ""}</span>
+                        <span>{task.title}</span><small>{task.status === "completed" ? "Done" : "In progress"}</small>
+                      </div>
+                    ))}
+                    {patientProgress.plan.instructions.filter((item) => item.audience === "clinician").map((item) => <p className={styles.clinicianItem} key={item.id}><strong>Doctor review:</strong> {item.text}</p>)}
+                  </>
+                ) : (
+                  <div className={styles.emptyState}><strong>No linked plan progress yet</strong><span>There is no approved plan connected to this local record.</span></div>
+                )}
+                {record.goals.length > 0 && <div className={styles.goals}><span className={styles.fieldLabel}>Care goals</span>{record.goals.map((goal) => <p key={goal}>{goal}</p>)}</div>}
+              </section>
 
-              <div className={styles.formGrid}>
-                <label>Full name<input value={record.name} onChange={(event) => edit({ name: event.target.value })} /></label>
-                <label>Date of birth<input type="date" value={record.dateOfBirth} onChange={(event) => edit({ dateOfBirth: event.target.value })} /></label>
-                <label>Phone<input type="tel" value={record.phone} onChange={(event) => edit({ phone: event.target.value })} /></label>
-                <label className={styles.wide}>Primary concern<input value={record.primaryConcern} onChange={(event) => edit({ primaryConcern: event.target.value })} /></label>
-              </div>
+              <section className={styles.drawerSection} aria-labelledby="medications-heading">
+                <div className={styles.sectionHeading}>
+                  <div><span className={styles.sectionNumber}>02</span><h3 id="medications-heading">Medications</h3></div>
+                  <span className={styles.sectionHint}>Doctor editable</span>
+                </div>
+                <p className={styles.sectionDescription}>Review the current list. Confirm details with the patient before changing a medication.</p>
+                <div className={styles.medicationList}>
+                  {record.medications.map((medication, index) => (
+                    <div className={styles.medicationRow} key={record.id + "-med-" + index}>
+                      <span className={styles.medicationIcon} aria-hidden="true">Rx</span>
+                      <input aria-label={"Medication " + (index + 1)} value={medication} onChange={(event) => edit({ medications: record.medications.map((item, itemIndex) => itemIndex === index ? event.target.value : item) })} />
+                      <button type="button" className={styles.iconButton} onClick={() => edit({ medications: record.medications.filter((_, itemIndex) => itemIndex !== index) })} aria-label={"Remove medication " + (index + 1)}>×</button>
+                    </div>
+                  ))}
+                  {!record.medications.length && <div className={styles.emptyState}><strong>No medications listed</strong><span>Add one after confirming the current list.</span></div>}
+                </div>
+                <button type="button" className={styles.addButton} onClick={() => edit({ medications: [...record.medications, ""] })}>＋ Add medication</button>
+              </section>
 
-              <div className={styles.sectionTitle}><h3>Care context</h3><span>Editable patient information</span></div>
-              <div className={styles.formGrid}>
-                <label>Allergies <small>One per line</small><textarea rows={3} value={lines(record.allergies)} onChange={(event) => edit({ allergies: fromLines(event.target.value) })} /></label>
-                <label>Current medications <small>One per line; include schedule only if confirmed</small><textarea rows={3} value={lines(record.medications)} onChange={(event) => edit({ medications: fromLines(event.target.value) })} /></label>
-                <label>Care goals <small>One per line</small><textarea rows={3} value={lines(record.goals)} onChange={(event) => edit({ goals: fromLines(event.target.value) })} /></label>
-                <label>Patient instructions <small>One per line</small><textarea rows={3} value={lines(record.patientInstructions)} onChange={(event) => edit({ patientInstructions: fromLines(event.target.value) })} /></label>
-              </div>
+              <section className={styles.drawerSection + " " + styles.calendarSection} aria-labelledby="calendar-heading">
+                <div className={styles.sectionHeading}>
+                  <div><span className={styles.sectionNumber}>03</span><h3 id="calendar-heading">Appointments</h3></div>
+                  <button type="button" className={styles.addButtonCompact} onClick={() => { setAppointmentDraft({ date: selectedDate, time: "", clinician: "", purpose: "" }); setAddingAppointment(true); }}>＋ Add appointment</button>
+                </div>
+                <div className={styles.calendar}>
+                  <div className={styles.calendarHeader}>
+                    <button type="button" className={styles.monthButton} onClick={() => setShownMonth((month) => new Date(month.getFullYear(), month.getMonth() - 1, 1))} aria-label="Previous month">‹</button>
+                    <strong>{shownMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong>
+                    <button type="button" className={styles.monthButton} onClick={() => setShownMonth((month) => new Date(month.getFullYear(), month.getMonth() + 1, 1))} aria-label="Next month">›</button>
+                  </div>
+                  <div className={styles.calendarGrid} role="grid" aria-label="Appointment calendar">
+                    {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((weekday) => <span className={styles.weekday} key={weekday}>{weekday}</span>)}
+                    {calendarCells.map((day, index) => {
+                      if (!day) return <span className={styles.blankDay} key={"blank-" + index} />;
+                      const date = dateKey(new Date(shownMonth.getFullYear(), shownMonth.getMonth(), day));
+                      const hasAppointment = appointments.some((appointment) => appointment.date === date);
+                      return <button type="button" role="gridcell" aria-label={displayDate(date) + (hasAppointment ? ", appointment scheduled" : "")} aria-pressed={selectedDate === date} className={styles.dayButton + " " + (selectedDate === date ? styles.daySelected : "") + " " + (hasAppointment ? styles.dayHasAppointment : "")} key={date} onClick={() => setSelectedDate(date)}>{day}{hasAppointment && <span className={styles.calendarDot} />}</button>;
+                    })}
+                  </div>
+                </div>
+                <div className={styles.agendaHeading}><strong>{displayDate(selectedDate, { weekday: "long", month: "long", day: "numeric" })}</strong><span>{selectedAppointments.length} scheduled</span></div>
+                {selectedAppointments.map((appointment) => (
+                  <div className={styles.appointmentCard} key={appointment.id}>
+                    <span className={styles.appointmentTime}>{appointment.time}</span>
+                    <div><strong>{appointment.purpose}</strong><span>{appointment.clinician || "Clinician not assigned"}</span></div>
+                    <button type="button" className={styles.removeAppointment} onClick={() => removeAppointment(appointment.id)}>Remove</button>
+                  </div>
+                ))}
+                {!selectedAppointments.length && <div className={styles.emptyAgenda}>No appointment scheduled for this day.</div>}
+                {addingAppointment && (
+                  <div className={styles.appointmentForm}>
+                    <div className={styles.formTitle}><strong>New appointment</strong><button type="button" className={styles.iconButton} onClick={() => setAddingAppointment(false)} aria-label="Cancel adding appointment">×</button></div>
+                    <label>Date<input type="date" value={appointmentDraft.date} onChange={(event) => setAppointmentDraft({ ...appointmentDraft, date: event.target.value })} /></label>
+                    <label>Time<input type="time" value={appointmentDraft.time} onChange={(event) => setAppointmentDraft({ ...appointmentDraft, time: event.target.value })} /></label>
+                    <label>Clinician<input type="text" value={appointmentDraft.clinician} onChange={(event) => setAppointmentDraft({ ...appointmentDraft, clinician: event.target.value })} placeholder="e.g. Dr. Avery" /></label>
+                    <label>Purpose<input type="text" value={appointmentDraft.purpose} onChange={(event) => setAppointmentDraft({ ...appointmentDraft, purpose: event.target.value })} placeholder="e.g. Follow-up" /></label>
+                    <button type="button" onClick={addAppointment} disabled={!appointmentDraft.date || !appointmentDraft.time || !appointmentDraft.purpose.trim()}>Add to calendar</button>
+                  </div>
+                )}
+              </section>
+            </div>
 
-              <div className={styles.sectionTitle}><h3>Next appointment</h3><span>Local planning details</span></div>
-              <div className={styles.formGrid}>
-                <label>Date<input type="date" value={record.nextAppointment?.date || ""} onChange={(event) => updateAppointment({ date: event.target.value })} /></label>
-                <label>Time<input type="text" placeholder="e.g. 10:30 AM" value={record.nextAppointment?.time || ""} onChange={(event) => updateAppointment({ time: event.target.value })} /></label>
-                <label>Clinician<input value={record.nextAppointment?.clinician || ""} onChange={(event) => updateAppointment({ clinician: event.target.value })} /></label>
-                <label>Purpose<input value={record.nextAppointment?.purpose || ""} onChange={(event) => updateAppointment({ purpose: event.target.value })} /></label>
-              </div>
-              <button className="secondary" type="button" onClick={() => edit({ nextAppointment: null })}>Clear appointment</button>
-
-              <div className={styles.formGrid}>
-                <label>Care alert <small>Patient-safe context for the assistant</small><textarea rows={2} value={record.careAlert} onChange={(event) => edit({ careAlert: event.target.value })} /></label>
-                <label>Doctor-only notes <small>Excluded from the patient assistant context</small><textarea rows={2} value={record.clinicianNotes} onChange={(event) => edit({ clinicianNotes: event.target.value })} /></label>
-              </div>
-
-              <div className={styles.footerActions}>
-                <p className={styles.patientMeta}>{dirty ? "Unsaved changes" : "All changes saved"}</p>
-                <button onClick={() => void save()} disabled={busy || !dirty}>{busy ? "Saving…" : "Save patient record"}</button>
-              </div>
-            </>
-          )}
-        </section>
-      </div>
+            <div className={styles.drawerFooter}>
+              <span className={styles.saveMessage}>{dirty ? "Unsaved changes" : status || "All changes saved"}</span>
+              <button className="secondary" type="button" onClick={closeDrawer}>Close</button>
+              <button type="button" onClick={() => void save()} disabled={!dirty || busy}>{busy ? "Saving…" : "Save changes"}</button>
+            </div>
+          </aside>
+        </>
+      )}
     </div>
   );
 }

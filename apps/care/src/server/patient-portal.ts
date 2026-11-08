@@ -8,6 +8,7 @@ const AppointmentSchema = z.object({
   clinician: z.string().trim().max(120),
   purpose: z.string().trim().max(240),
 }).strict();
+const ScheduledAppointmentSchema = AppointmentSchema.extend({ id: z.string().min(1).max(100) }).strict();
 
 const PatientRecordSchema = z.object({
   id: z.string(),
@@ -18,6 +19,7 @@ const PatientRecordSchema = z.object({
   status: z.enum(["Active", "Follow-up due", "Needs review"]),
   lastVisit: z.string().max(20),
   nextAppointment: AppointmentSchema.nullable(),
+  appointments: z.array(ScheduledAppointmentSchema).max(100),
   allergies: z.array(z.string().trim().min(1).max(200)).max(30),
   medications: z.array(z.string().trim().min(1).max(300)).max(40),
   goals: z.array(z.string().trim().min(1).max(300)).max(30),
@@ -50,6 +52,7 @@ const localDemoPatients: PatientRecord[] = [
     status: "Follow-up due",
     lastVisit: "2026-10-30",
     nextAppointment: { date: "2026-11-12", time: "10:30 AM", clinician: "Dr. Avery", purpose: "Follow-up visit" },
+    appointments: [{ id: "appt-demo-001", date: "2026-11-12", time: "10:30 AM", clinician: "Dr. Avery", purpose: "Follow-up visit" }],
     allergies: ["Penicillin (reported)"],
     medications: ["Medication review needed — confirm current list with patient"],
     goals: ["Review recovery progress at next visit", "Discuss any new symptoms with the care team"],
@@ -67,6 +70,7 @@ const localDemoPatients: PatientRecord[] = [
     status: "Active",
     lastVisit: "2026-11-02",
     nextAppointment: { date: "2026-11-19", time: "2:00 PM", clinician: "Dr. Avery", purpose: "Scheduled check-in" },
+    appointments: [{ id: "appt-demo-002", date: "2026-11-19", time: "2:00 PM", clinician: "Dr. Avery", purpose: "Scheduled check-in" }],
     allergies: ["No allergies recorded in this demo"],
     medications: ["No medication list recorded in this demo"],
     goals: ["Review progress at the next check-in"],
@@ -84,6 +88,7 @@ const localDemoPatients: PatientRecord[] = [
     status: "Needs review",
     lastVisit: "2026-10-21",
     nextAppointment: null,
+    appointments: [],
     allergies: ["Not reviewed"],
     medications: ["Not reviewed"],
     goals: ["Confirm care goals with the patient"],
@@ -98,6 +103,13 @@ function stateWithPatients(state: PortalState): PortalState {
   // Older local demo files predate the clinician portal. Backfill its synthetic
   // records in memory and persist them the next time a doctor saves/selects.
   if (!Array.isArray(state.patients)) state.patients = structuredClone(localDemoPatients);
+  for (const patient of state.patients) {
+    if (!Array.isArray(patient.appointments)) {
+      patient.appointments = patient.nextAppointment
+        ? [{ id: `legacy-${patient.id}-next`, ...patient.nextAppointment }]
+        : [];
+    }
+  }
   if (!state.selectedPatientId || !state.patients.some((patient) => patient.id === state.selectedPatientId)) {
     state.selectedPatientId = state.patients[0]?.id || localDemoPatients[0].id;
   }
@@ -113,11 +125,12 @@ const store = new JsonStore<PortalState>(dataFile("care"), () => ({
 
 export async function listPatientRows() {
   const state = stateWithPatients(await store.snapshot());
+  const priority = (status: PatientRecord["status"]) => status === "Needs review" ? 0 : status === "Follow-up due" ? 1 : 2;
   return {
     selectedPatientId: state.selectedPatientId,
     patients: state.patients.map(({ id, name, dateOfBirth, primaryConcern, status, nextAppointment }) => ({
       id, name, dateOfBirth, primaryConcern, status, nextAppointment,
-    })),
+    })).sort((a, b) => priority(a.status) - priority(b.status) || a.name.localeCompare(b.name)),
   };
 }
 
@@ -134,9 +147,12 @@ export async function updatePatientRecord(id: string, raw: unknown) {
     stateWithPatients(state);
     const index = state.patients.findIndex((entry) => entry.id === id);
     if (index < 0) throw new DomainError("NOT_FOUND", "Patient record not found", 404);
+    const appointments = [...update.appointments].sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
     const patient = PatientRecordSchema.parse({
       ...state.patients[index],
       ...update,
+      appointments,
+      nextAppointment: appointments[0] ? (({ id: _id, ...appointment }) => appointment)(appointments[0]) : null,
       updatedAt: new Date().toISOString(),
     });
     state.patients[index] = patient;
@@ -170,6 +186,7 @@ export async function getActivePatientContext() {
     patientInstructions: patient.patientInstructions,
     careAlert: patient.careAlert,
     nextAppointment: patient.nextAppointment,
+    appointments: patient.appointments,
     synthetic: true as const,
   };
 }
